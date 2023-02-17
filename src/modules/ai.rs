@@ -14,7 +14,7 @@ struct Config {
     personalities: String,
 }
 pub struct Ai;
-   
+   // setup a prompt and respnse log for training other bots
 impl Command for Ai {
     fn handle(&self, message: &str) -> Vec<String> {
         let mut responses = Vec::new();
