@@ -31,6 +31,8 @@ struct Config {
     nick: String,
     password: String,
     channels: Vec<String>,
+    admin_users: Vec<String>,
+    ignore_users: Vec<String>,
 }
 
 fn main() {
@@ -39,31 +41,26 @@ fn main() {
         .build()
         .unwrap();
 
-// PUT CONFIG IN A SEPRATE FILE IE: CONFIG.TOML
-    // read the contents of the config file into a string
+    // LOAD CONFIG
     let config_str = std::fs::read_to_string("config.toml").unwrap();
-
-    // parse the string into a toml::Value
     let config_value = config_str.parse::<Value>().unwrap();
-
-    // deserialize the value into a Config struct
     let config: Config = config_value.try_into().unwrap();
-
-    let stream = TcpStream::connect(format!("{}:{}", config.server, config.port)).unwrap();; // DONT DO DRUGS YOU WILL END UP LIKE ME 
+    // GIVE THE SERVER A SLOPPPY SPAM OF RETARDEDNESS
+    let stream = TcpStream::connect(format!("{}:{}", config.server, config.port)).unwrap(); 
     let connector = SslConnector::builder(SslMethod::tls()).unwrap().build();
+    // DONT DO DRUGS YOU WILL END UP LIKE ME
     let mut ssl_stream = connector.connect(&config.server, stream).unwrap();
     let nick_command = format!("NICK {}_\r\n", config.nick); //setup passwords
     let user_command = format!("USER {} 0 * :{}\r\n", config.nick, config.nick);
     ssl_stream.write_all(nick_command.as_bytes()).unwrap();
     ssl_stream.write_all(user_command.as_bytes()).unwrap();
-
     let identify_command = format!("PRIVMSG NickServ :IDENTIFY {} {}\r\n", config.nick, config.password);
     ssl_stream.write(identify_command.as_bytes()).unwrap();
     let channels = config.channels.join(",");
     let join_command = format!("JOIN {}\r\n", channels);
     
-    let admin_users = vec!["s4d", "s4d[m]"]; // ADMINS
-    let ignored_users = vec!["maple", "aibird", "proffesserOak"]; // IGNORED
+    let admin_users = config.admin_users; // ADMINS
+    let ignored_users = config.ignore_users; // IGNORED
 // ... 
     ssl_stream.write_all(join_command.as_bytes()).unwrap();
 
@@ -95,7 +92,7 @@ fn main() {
                 if message.starts_with(":") && message.contains(" :%") {
                     let parts: Vec<&str> = message.splitn(2, ' ').collect(); // Check if user is admin_user
                     let username = parts[0].trim_start_matches(':').split("!").next().unwrap();
-                    if !admin_users.contains(&username) {
+                    if !admin_users.contains(&username.to_string()) {
                         println!("[!] UNAUTHORIZED: {}", username);
                         continue; // ...
                     }
@@ -111,7 +108,7 @@ fn main() {
                 }
 
                 // Check if the message is user and respond via ai
-                else if message.starts_with(":") && message.contains("PRIVMSG ") && message.contains("g1r") { //modify for on mention 
+                else if message.starts_with(":") && message.contains("PRIVMSG ") && message.contains(&config.nick) { //modify for on mention 
                     let channel = message.split("PRIVMSG ").nth(1).and_then(|s| s.splitn(2, ' ').next()).unwrap();
                     if !channels.contains(&channel) {
                         continue;
@@ -119,7 +116,7 @@ fn main() {
                     // extract the username from the first part and check if ignored
                     let parts: Vec<&str> = message.splitn(2, ' ').collect(); // split the message into two parts at the first space
                     let username = parts[0].trim_start_matches(':').split("!").next().unwrap();
-                    if ignored_users.contains(&username) {
+                    if ignored_users.contains(&username.to_string()) {
                         println!("[!] IGNORED: {}", username); 
                         continue;
                     }

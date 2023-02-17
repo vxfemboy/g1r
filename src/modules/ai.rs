@@ -2,16 +2,32 @@
 use async_openai::{Client, types::{CreateCompletionRequestArgs}};
 use regex::Regex;
 use crate::modules::Command;
-
+use toml::{from_str, Value};
+use serde::Deserialize;
+#[derive(Deserialize)]
+struct Config {
+    nick: String,
+    channels: Vec<String>,
+    openai: String,
+    accents: String,
+    personalities: String,
+}
 pub struct Ai;
    
 impl Command for Ai {
     fn handle(&self, message: &str) -> Vec<String> {
         let mut responses = Vec::new();
-        if message.starts_with(":") && message.contains("PRIVMSG ") && message.contains("g1r") { 
+        let config_str = std::fs::read_to_string("config.toml").unwrap();
+        let config_value = config_str.parse::<Value>().unwrap();
+        let config: Config = config_value.try_into().unwrap();
+        if message.starts_with(":") && message.contains("PRIVMSG ") && message.contains(&config.nick) { 
             let channel = message.split("PRIVMSG ").nth(1).and_then(|s| s.splitn(2, ' ').next()).unwrap(); // set the response to varible
-            let user_message = "The following is a chat log:\n".to_owned() + message.split(&format!("PRIVMSG {} :", channel.to_string())).nth(1).unwrap() + "\nRespond funny, completely insane, and hyperactive as you are chatting as GIR from Invader Zim: \n\n";                    
-            let parts: Vec<&str> = message.splitn(2, ' ').collect();
+            let user_message = format!("The following is a chat log:\n{}\nRespond {} as you are chatting as {}: \n\n", 
+                message.split(&format!("PRIVMSG {} :", channel.to_string())).nth(1).unwrap(),
+                config.accents,
+                config.personalities
+            );                    
+            let parts: Vec<&str> = message.splitn(2, ' ').collect();    
             let username = parts[0].trim_start_matches(':').split("!").next().unwrap();
 
             let rt = tokio::runtime::Runtime::new().unwrap();
@@ -23,7 +39,10 @@ impl Command for Ai {
     }
 }
 async fn ai(user_message: &str, username: &str, channel: &str) -> Vec<String> {
-    let api_key = "sk-*"; // set this from config
+    let config_str = std::fs::read_to_string("config.toml").unwrap();
+    let config_value = config_str.parse::<Value>().unwrap();
+    let config: Config = config_value.try_into().unwrap();
+    let api_key = config.openai; // set this from config
 
     let client = Client::new().with_api_key(api_key);
     println!("[?] PROMPT: {}: {}", username, user_message);
