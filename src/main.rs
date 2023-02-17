@@ -3,13 +3,13 @@ use std::net::TcpStream;
 use std::time::{Instant, Duration};
 use std::fs;
 use std::thread;
-use toml::Value;
 use std::io::{self, Write};
 use regex::Regex;
 use rand::{thread_rng, Rng};
 use openssl::ssl::{SslMethod, SslConnector, SslStream};
 use async_openai::{Client, types::{CreateCompletionRequestArgs, ResponseFormat}};
-
+use toml::{from_str, Value};
+use serde::Deserialize;
 mod modules {
     pub trait Command {
         fn handle(&self, message: &str) -> Vec<String>;
@@ -18,33 +18,53 @@ mod modules {
     pub mod kill;
     pub mod ai;
 }
-use modules::ai::Ai;
+
+use modules::ai::Ai; // FIX THIS BS
 use modules::ping::PingCommand;
-use modules::kill::KillCommand;
+use modules::kill::KillCommand; // ...
 use crate::modules::Command;
+
+#[derive(Deserialize)]
+struct Config {
+    server: String,
+    port: u16,
+    nick: String,
+    password: String,
+    channels: Vec<String>,
+}
+
 fn main() {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap();
 
+// PUT CONFIG IN A SEPRATE FILE IE: CONFIG.TOML
+    // read the contents of the config file into a string
+    let config_str = std::fs::read_to_string("config.toml").unwrap();
+
+    // parse the string into a toml::Value
+    let config_value = config_str.parse::<Value>().unwrap();
+
+    // deserialize the value into a Config struct
+    let config: Config = config_value.try_into().unwrap();
+
+    let stream = TcpStream::connect(format!("{}:{}", config.server, config.port)).unwrap();; // DONT DO DRUGS YOU WILL END UP LIKE ME 
     let connector = SslConnector::builder(SslMethod::tls()).unwrap().build();
-// PUT CONFIG IN A SEPRATE FILE IE: YAML, JSON, CONFIG, TOML12
-    let stream = TcpStream::connect("ircd.chat:6697").unwrap(); // setup tor & custom masking
-    let mut ssl_stream = connector.connect("ircd.chat", stream).unwrap();
+    let mut ssl_stream = connector.connect(&config.server, stream).unwrap();
+    let nick_command = format!("NICK {}_\r\n", config.nick); //setup passwords
+    let user_command = format!("USER {} 0 * :{}\r\n", config.nick, config.nick);
+    ssl_stream.write_all(nick_command.as_bytes()).unwrap();
+    ssl_stream.write_all(user_command.as_bytes()).unwrap();
 
-    let nick_command = "NICK g1r\r\n"; // set SASL Passwords User Nicks
-    let user_command = "USER g1r 0 * :g1r\r\n";
-
-
-    let channels = vec!["#tcpdirect", "#macros"]; // CHANNELS
-    let join_command = format!("JOIN {}\r\n", channels.join(","));
-
+    let identify_command = format!("PRIVMSG NickServ :IDENTIFY {} {}\r\n", config.nick, config.password);
+    ssl_stream.write(identify_command.as_bytes()).unwrap();
+    let channels = config.channels.join(",");
+    let join_command = format!("JOIN {}\r\n", channels);
+    
     let admin_users = vec!["s4d", "s4d[m]"]; // ADMINS
     let ignored_users = vec!["maple", "aibird", "proffesserOak"]; // IGNORED
 // ... 
-    ssl_stream.write_all(nick_command.as_bytes()).unwrap();
-    ssl_stream.write_all(user_command.as_bytes()).unwrap();
     ssl_stream.write_all(join_command.as_bytes()).unwrap();
 
     let mut buf = [0; 512];

@@ -9,7 +9,7 @@ impl Command for Ai {
     fn handle(&self, message: &str) -> Vec<String> {
         let mut responses = Vec::new();
         if message.starts_with(":") && message.contains("PRIVMSG ") && message.contains("g1r") { 
-            let channel = message.split("PRIVMSG ").nth(1).and_then(|s| s.splitn(2, ' ').next()).unwrap();
+            let channel = message.split("PRIVMSG ").nth(1).and_then(|s| s.splitn(2, ' ').next()).unwrap(); // set the response to varible
             let user_message = "The following is a chat log:\n".to_owned() + message.split(&format!("PRIVMSG {} :", channel.to_string())).nth(1).unwrap() + "\nRespond funny, completely insane, and hyperactive as you are chatting as GIR from Invader Zim: \n\n";                    
             let parts: Vec<&str> = message.splitn(2, ' ').collect();
             let username = parts[0].trim_start_matches(':').split("!").next().unwrap();
@@ -23,7 +23,7 @@ impl Command for Ai {
     }
 }
 async fn ai(user_message: &str, username: &str, channel: &str) -> Vec<String> {
-    let api_key = "sk-*"; // set this from config and add rotatation
+    let api_key = "sk-*"; // set this from config
 
     let client = Client::new().with_api_key(api_key);
     println!("[?] PROMPT: {}: {}", username, user_message);
@@ -39,9 +39,9 @@ async fn ai(user_message: &str, username: &str, channel: &str) -> Vec<String> {
         .await
         .unwrap();
     println!("[+] RESPONSE: {}", chat_response.choices.first().unwrap().text);
-
+    //modify regex for varible username ie G1R g1r GIR gir but as handle nick for bots
     let response_text = &chat_response.choices.first().unwrap().text;
-    let regex = Regex::new(r#""|[gG][1iI][rR]:\s*|[mM][eE]:?\s"#).unwrap();
+    let regex = Regex::new(r#""|[gG][1iI][rR]:\s*|[mM][eE]:?\s"#).unwrap(); 
     let response_text = regex.replace_all(response_text, "").trim().to_string();
     let response_lines = response_text.split("\n").filter(|line| !line.trim().is_empty());
     let mut responses = Vec::new();
