@@ -74,7 +74,7 @@ fn main() {
 
                 // RESPOND TO PINGS
                 if message.starts_with("PING") {
-                    println!("[%] PONG");
+                    println!("[%] PONG {}", config.nick);
                     ssl_stream.write_all("PONG ircd.chat\r\n".as_bytes()).unwrap();
                     continue; // skip processing the PING message further
                 }

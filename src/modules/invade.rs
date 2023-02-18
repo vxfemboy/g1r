@@ -1,15 +1,13 @@
 use crate::modules::Command;
 
 use std::cell::RefCell;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{Write};
 use std::net::TcpStream;
 use std::rc::Rc;
 
 use openssl::ssl::{SslConnector, SslMethod};
 use serde::Deserialize;
 use toml::Value;
-
-
 
 #[derive(Clone, Deserialize)]
 struct Config {
@@ -39,34 +37,30 @@ impl Command for InvadeCommand {
                 let thread_invader = invader.to_string();
                 let config_clone = config.clone();
                 let screaming = scream.to_string();
-                
 
                 std::thread::spawn(move || {
-                    let stream = TcpStream::connect(format!("{}:{}", config_clone.server, config_clone.port)).unwrap();
+                    let stream = TcpStream::connect((config_clone.server.as_str(), config_clone.port)).unwrap();
                     let connector = SslConnector::builder(SslMethod::tls()).unwrap().build();
-                    let ssl_stream = connector.connect(&config_clone.server, stream).unwrap();
-                    let ssl_stream = Rc::new(RefCell::new(ssl_stream));
+                    let mut ssl_stream = connector.connect(config_clone.server.as_str(), stream).unwrap();
                     let nick_command = format!("NICK {}\r\n", thread_invader);
                     let user_command = format!("USER {} 0 * :{}\r\n", thread_invader, thread_invader);
-                    ssl_stream.borrow_mut().write_all(nick_command.as_bytes()).unwrap();
-                    ssl_stream.borrow_mut().write_all(user_command.as_bytes()).unwrap();
+                    ssl_stream.write_all(nick_command.as_bytes()).unwrap();
+                    ssl_stream.write_all(user_command.as_bytes()).unwrap();
                     let join_command = format!("JOIN {} \r\n", thread_channel);
-                    ssl_stream.borrow_mut().write_all(join_command.as_bytes()).unwrap();
+                    ssl_stream.write_all(join_command.as_bytes()).unwrap();
                     let msg = format!("PRIVMSG {} :{}\r\n", thread_channel, screaming);
-                    ssl_stream.borrow_mut().write_all(msg.as_bytes()).unwrap();
-
+                    ssl_stream.write_all(msg.as_bytes()).unwrap();
 
                     loop {
-                        let mut ssl_stream_ref = ssl_stream.borrow_mut();
-                        let mut reader = BufReader::new(&mut *ssl_stream_ref);
-                                        
-                        let mut message = String::new();
-                        match reader.read_line(&mut message) {
+                        let mut buffer = [0; 512];
+                        match ssl_stream.ssl_read(&mut buffer) {
                             Ok(0) => break,
-                            Ok(_) => {
+                            Ok(n) => {
+                                let message = String::from_utf8_lossy(&buffer[..n]);
                                 if message.starts_with("PING") {
                                     let response = message.replace("PING", "PONG");
-                                    ssl_stream.borrow_mut().write_all(response.as_bytes()).unwrap();
+                                    println!("[%] PONG {}", thread_invader);
+                                    ssl_stream.write_all(response.as_bytes()).unwrap();
                                 }
                             }
                             Err(e) => {
