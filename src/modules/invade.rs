@@ -34,7 +34,7 @@ impl Command for InvadeCommand {
             let config_value = config_str.parse::<Value>().unwrap();
             let config: Config = config_value.try_into().unwrap();
 
-            for invader in &config.invaders {
+            for invader in &config.invaders[0..num_bots] {
                 let thread_channel = invadechannel.to_string();
                 let thread_invader = invader.to_string();
                 let config_clone = config.clone();
