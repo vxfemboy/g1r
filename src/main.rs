@@ -105,7 +105,7 @@ fn main() {
                         for response in invade_command.handle(message) {
                             ssl_stream.write_all(response.as_bytes()).unwrap();
                         }
-                    }
+                    } 
                 }
 
                 // Check if the message is user and respond via ai

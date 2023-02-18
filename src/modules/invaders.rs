@@ -1,11 +1,10 @@
 use crate::modules::Command;
-
 use std::io::{Write};
 use std::net::TcpStream;
-
 use openssl::ssl::{SslConnector, SslMethod};
 use serde::Deserialize;
 use toml::Value;
+use std::thread;
 
 #[derive(Clone, Deserialize)]
 struct Config {
@@ -14,38 +13,30 @@ struct Config {
     port: u16,
 }
 
-pub struct InvadeCommand;
+pub struct InvadersCommand;
 
-impl Command for InvadeCommand {
+impl Command for InvadersCommand {
     fn handle(&self, message: &str) -> Vec<String> {
         let mut response = vec![];
 
-        if message.contains("PRIVMSG") && message.contains(":%invade") {
+        if message.contains("PRIVMSG") && message.contains(":%invaders") {
             let parts: Vec<&str> = message.split_whitespace().collect();
-            let num_invaders = parts[4].parse::<u32>().unwrap_or(1) as usize;
-            let channel = parts[2];
-            let invadechannel = parts[5];
-            let scream = parts[6];
+            let scream = parts[1];
+
             let config_str = std::fs::read_to_string("config.toml").unwrap();
             let config_value = config_str.parse::<Value>().unwrap();
             let config: Config = config_value.try_into().unwrap();
 
-            for invader in &config.invaders[0..num_invaders] {
-                let thread_channel = invadechannel.to_string();
+            for invader in &config.invaders {
+                let thread_channel = parts[2].to_string();
                 let thread_invader = invader.to_string();
-                let config_clone = config.clone();
                 let screaming = scream.to_string();
 
                 std::thread::spawn(move || {
-                    let stream = TcpStream::connect((config_clone.server.as_str(), config_clone.port)).unwrap();
+                    let stream = TcpStream::connect((config.server.as_str(), config.port)).unwrap();
                     let connector = SslConnector::builder(SslMethod::tls()).unwrap().build();
-                    let mut ssl_stream = connector.connect(config_clone.server.as_str(), stream).unwrap();
-                    let nick_command = format!("NICK {}\r\n", thread_invader);
-                    let user_command = format!("USER {} 0 * :{}\r\n", thread_invader, thread_invader);
-                    ssl_stream.write_all(nick_command.as_bytes()).unwrap();
-                    ssl_stream.write_all(user_command.as_bytes()).unwrap();
-                    let join_command = format!("JOIN {} \r\n", thread_channel);
-                    ssl_stream.write_all(join_command.as_bytes()).unwrap();
+                    let mut ssl_stream = connector.connect(config.server.as_str(), stream).unwrap();
+
                     let msg = format!("PRIVMSG {} :{}\r\n", thread_channel, screaming);
                     ssl_stream.write_all(msg.as_bytes()).unwrap();
 
@@ -70,7 +61,7 @@ impl Command for InvadeCommand {
                 });
             }
 
-            response.push(format!("PRIVMSG {} :INVADING WITH {} INVADERS...\r\n", channel, num_invaders));
+            response.push(format!("PRIVMSG {} :Screaming \"{}\" through {} invaders..\r\n", parts[2], scream, config.invaders.len()));
         }
 
         response

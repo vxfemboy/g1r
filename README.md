@@ -4,10 +4,11 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 
 # TODO
 - multi server
-- add bots
 - proxy support
 - ident rand
+- bridging
 - user log
 - user clone
-- console
+- console 
+- colors
 - scan

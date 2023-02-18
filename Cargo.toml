@@ -1,5 +1,5 @@
 [package]
-name = "kmsbot"
+name = "g1r"
 version = "0.1.0"
 edition = "2021"
 
@@ -14,4 +14,3 @@ regex = "1.7.1"
 toml = "0.7.2"
 serde = "1.0.152"
 tokio-openssl = "0.6.3"
-webpki = "0.22.0"
