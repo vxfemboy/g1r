@@ -2,12 +2,11 @@
 use async_openai::{Client, types::{CreateCompletionRequestArgs}};
 use regex::Regex;
 use crate::modules::Command;
-use toml::{from_str, Value};
+use toml::Value;
 use serde::Deserialize;
 #[derive(Deserialize)]
 struct Config {
     nick: String,
-    channels: Vec<String>,
     openai: String,
     model: String,
     accents: String,
@@ -61,7 +60,7 @@ async fn ai(user_message: &str, username: &str, channel: &str) -> Vec<String> {
     println!("[+] RESPONSE: {}", chat_response.choices.first().unwrap().text);
     //modify regex for varible username ie G1R g1r GIR gir but as handle nick for bots
     let response_text = &chat_response.choices.first().unwrap().text;
-    let regex = Regex::new(r#""|[gG][1iI][rR]:\s*|[mM][eE]:?\s"#).unwrap(); 
+    let regex = Regex::new(r#""|[gG][1iI][rR]:\s*|[mM][eE]:?\s"#).unwrap(); // THIS IS FUCKING UP EVERYTHING
     //let nick = &config.nick;
     //let regex_str = format!(
     //    r#""|[{}{}{}]|\b[gG][1iI][rR]:\s*|\b[mM][eE]:?\s"#,

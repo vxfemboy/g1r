@@ -3,6 +3,7 @@
 AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 
 # TODO
+- multi server
 - add bots
 - proxy support
 - ident rand

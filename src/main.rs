@@ -1,14 +1,8 @@
 use std::io::prelude::*;
 use std::net::TcpStream;
-use std::time::{Instant, Duration};
-use std::fs;
-use std::thread;
-use std::io::{self, Write};
-use regex::Regex;
-use rand::{thread_rng, Rng};
-use openssl::ssl::{SslMethod, SslConnector, SslStream};
-use async_openai::{Client, types::{CreateCompletionRequestArgs, ResponseFormat}};
-use toml::{from_str, Value};
+use std::io::Write;
+use openssl::ssl::{SslMethod, SslConnector};
+use toml::Value;
 use serde::Deserialize;
 mod modules {
     pub trait Command {
@@ -17,10 +11,12 @@ mod modules {
     pub mod ping;
     pub mod kill;
     pub mod ai;
+    pub mod invade;
 }
 
 use modules::ai::Ai; // FIX THIS BS
 use modules::ping::PingCommand;
+use modules::invade::InvadeCommand;
 use modules::kill::KillCommand; // ...
 use crate::modules::Command;
 
@@ -86,6 +82,7 @@ fn main() {
                 // MODULES
                 let ping_command = PingCommand;
                 let kill_command = KillCommand;
+                let invade_command = InvadeCommand;
                 let ai = Ai;
 
                 // ADMIN MODULES
@@ -102,6 +99,10 @@ fn main() {
                         }
                     } else if message.contains(":%kill") {
                         for response in kill_command.handle(message) {
+                            ssl_stream.write_all(response.as_bytes()).unwrap();
+                        }
+                    } else if message.contains(":%invade") {
+                        for response in invade_command.handle(message) {
                             ssl_stream.write_all(response.as_bytes()).unwrap();
                         }
                     }
