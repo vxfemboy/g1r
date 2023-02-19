@@ -25,7 +25,7 @@ impl Command for InvadeCommand {
             let num_invaders = parts[4].parse::<u32>().unwrap_or(1) as usize;
             let channel = parts[2];
             let invadechannel = parts[5];
-            let scream = parts[6];
+            let scream = if parts.len() > 6 { parts[6] } else { "" };
             let config_str = std::fs::read_to_string("config.toml").unwrap();
             let config_value = config_str.parse::<Value>().unwrap();
             let config: Config = config_value.try_into().unwrap();
