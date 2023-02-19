@@ -4,6 +4,7 @@ use std::io::Write;
 use openssl::ssl::{SslMethod, SslConnector};
 use toml::Value;
 use serde::Deserialize;
+use colored::*;
 mod modules {
     pub trait Command {
         fn handle(&self, message: &str) -> Vec<String>;
@@ -74,7 +75,7 @@ fn main() {
 
                 // RESPOND TO PINGS
                 if message.starts_with("PING") {
-                    println!("[%] PONG {}", config.nick);
+                    println!("[%] PONG {}", config.nick.blue());
                     ssl_stream.write_all("PONG ircd.chat\r\n".as_bytes()).unwrap();
                     continue; // skip processing the PING message further
                 }
@@ -90,7 +91,7 @@ fn main() {
                     let parts: Vec<&str> = message.splitn(2, ' ').collect(); // Check if user is admin_user
                     let username = parts[0].trim_start_matches(':').split("!").next().unwrap();
                     if !admin_users.contains(&username.to_string()) {
-                        println!("[!] UNAUTHORIZED: {}", username);
+                        println!("[!] UNAUTHORIZED: {}", username.red());
                         continue; // ...
                     }
                     if message.contains(":%ping") {
@@ -118,7 +119,7 @@ fn main() {
                     let parts: Vec<&str> = message.splitn(2, ' ').collect(); // split the message into two parts at the first space
                     let username = parts[0].trim_start_matches(':').split("!").next().unwrap();
                     if ignored_users.contains(&username.to_string()) {
-                        println!("[!] IGNORED: {}", username); 
+                        println!("[!] IGNORED: {}", username.red()); 
                         continue;
                     }
                     for response in ai.handle(message, ) {
@@ -129,7 +130,7 @@ fn main() {
 
             },
             Err(e) => {
-                println!("Error: {}", e);
+                println!("[!] ERROR: {}", e);
                 break;
             },
         }

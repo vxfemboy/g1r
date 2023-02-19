@@ -6,7 +6,6 @@ use std::net::TcpStream;
 use openssl::ssl::{SslConnector, SslMethod};
 use serde::Deserialize;
 use toml::Value;
-
 #[derive(Clone, Deserialize)]
 struct Config {
     invaders: Vec<String>,

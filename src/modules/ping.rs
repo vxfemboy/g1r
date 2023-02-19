@@ -1,7 +1,6 @@
 
 use std::time::{Instant};
 use crate::modules::Command;
-
 pub struct PingCommand;
 impl Command for PingCommand {
     fn handle(&self, message: &str) -> Vec<String> {
