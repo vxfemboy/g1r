@@ -1,11 +1,13 @@
 use crate::modules::Command;
 
-use std::io::{Write};
+use std::io::{BufRead, BufReader, Write};
 use std::net::TcpStream;
-
 use openssl::ssl::{SslConnector, SslMethod};
 use serde::Deserialize;
 use toml::Value;
+use colored::*;
+
+
 #[derive(Clone, Deserialize)]
 struct Config {
     invaders: Vec<String>,
@@ -29,6 +31,7 @@ impl Command for InvadeCommand {
             let config_value = config_str.parse::<Value>().unwrap();
             let config: Config = config_value.try_into().unwrap();
 
+
             for invader in &config.invaders[0..num_invaders] {
                 let thread_channel = invadechannel.to_string();
                 let thread_invader = invader.to_string();
@@ -49,19 +52,31 @@ impl Command for InvadeCommand {
                     ssl_stream.write_all(msg.as_bytes()).unwrap();
 
                     loop {
-                        let mut buffer = [0; 512];
-                        match ssl_stream.ssl_read(&mut buffer) {
+
+
+                        
+                        let mut buf = [0; 512];
+                        match ssl_stream.ssl_read(&mut buf) {
                             Ok(0) => break,
                             Ok(n) => {
-                                let message = String::from_utf8_lossy(&buffer[..n]);
+                                let received = String::from_utf8_lossy(&buf[0..n]);
+                                let message = received.trim();
+                
+                                //debug chat 
+                                println!("{} {} {}","[%] DEBUG:".bold().green(), thread_invader.green(), received.blue());
+
                                 if message.starts_with("PING") {
                                     let response = message.replace("PING", "PONG");
-                                    println!("[%] PONG {}", thread_invader);
+                                    println!("{} {}","[%] PONG:".bold().green(), thread_invader.blue());
+                                    ssl_stream.write_all(response.as_bytes()).unwrap();
+                                }
+                                if message.contains("PRIVMSG") && message.contains(":%%fuck") {
+                                    let response = format!("PRIVMSG {} :FUCKFUCKFUCK\r\n", thread_channel);
                                     ssl_stream.write_all(response.as_bytes()).unwrap();
                                 }
                             }
                             Err(e) => {
-                                eprintln!("Error reading from server: {}", e);
+                                eprintln!("{} {}","[!] ERROR FROM SERVER:".on_red(), e);
                                 break;
                             }
                         }
@@ -69,7 +84,7 @@ impl Command for InvadeCommand {
                 });
             }
 
-            response.push(format!("PRIVMSG {} :INVADING WITH {} INVADERS...\r\n", channel, num_invaders));
+            response.push(format!("PRIVMSG {} :\x0304,01[!] INVADING {} WITH {} INVADERS...\x0f\r\n", channel, invadechannel, num_invaders));
         }
 
         response

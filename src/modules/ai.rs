@@ -4,6 +4,8 @@ use regex::Regex;
 use crate::modules::Command;
 use toml::Value;
 use serde::Deserialize;
+use colored::*;
+
 #[derive(Deserialize)]
 struct Config {
     nick: String,
@@ -45,7 +47,7 @@ async fn ai(user_message: &str, username: &str, channel: &str) -> Vec<String> {
     let api_key = config.openai; // set this from config
 
     let client = Client::new().with_api_key(api_key);
-    println!("[?] PROMPT: {}: {}", username, user_message);
+    println!("{} {} {}: {}", "[?]".on_green().bold(), "PROMPT:".green().bold(), username, user_message);
     let chat_request = CreateCompletionRequestArgs::default()
         .prompt(user_message)
         .max_tokens(40_u16)
@@ -57,10 +59,10 @@ async fn ai(user_message: &str, username: &str, channel: &str) -> Vec<String> {
         .create(chat_request)
         .await
         .unwrap();
-    println!("[+] RESPONSE: {}", chat_response.choices.first().unwrap().text);
+    println!("{} {} {}","[+]".on_green().bold(), "RESPONSE:".green().bold(), chat_response.choices.first().unwrap().text);
     //modify regex for varible username ie G1R g1r GIR gir but as handle nick for bots
     let response_text = &chat_response.choices.first().unwrap().text;
-    let regex = Regex::new(r#""|[gG][1iI][rR]:\s*|[mM][eE]:?\s"#).unwrap(); // THIS IS FUCKING UP EVERYTHING
+    let regex = Regex::new(r#""|[gG][1iI][rR]:\s"#).unwrap(); // THIS IS FUCKING UP EVERYTHING
     //let nick = &config.nick;
     //let regex_str = format!(
     //    r#""|[{}{}{}]|\b[gG][1iI][rR]:\s*|\b[mM][eE]:?\s"#,
@@ -80,7 +82,7 @@ async fn ai(user_message: &str, username: &str, channel: &str) -> Vec<String> {
     let response_lines = response_text.split("\n").filter(|line| !line.trim().is_empty());
     let mut responses = Vec::new();
     for line in response_lines {
-        responses.push(format!("PRIVMSG {} :{}: {}\r\n", channel, username, line));
+        responses.push(format!("PRIVMSG {} :\x0313{}\x0f: {}\r\n", channel, username, line));
     }
     
     responses

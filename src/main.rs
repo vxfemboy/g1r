@@ -13,11 +13,13 @@ mod modules {
     pub mod kill;
     pub mod ai;
     pub mod invade;
+    pub mod test;
 }
 
 use modules::ai::Ai; // FIX THIS BS
 use modules::ping::PingCommand;
 use modules::invade::InvadeCommand;
+//use modules::test::TestCommand;
 use modules::kill::KillCommand; // ...
 use crate::modules::Command;
 
@@ -70,12 +72,12 @@ fn main() {
                 let message = received.trim();
 
                 //debug chat 
-                println!("{}", received); // ADD COLORS
+                println!("{} {}","[%] DEBUG:".bold().green(), received.purple());
 
 
                 // RESPOND TO PINGS
                 if message.starts_with("PING") {
-                    println!("[%] PONG {}", config.nick.blue());
+                    println!("{} {}","[%] PONG:".bold().green(), config.nick.blue()); // DEBUG
                     ssl_stream.write_all("PONG ircd.chat\r\n".as_bytes()).unwrap();
                     continue; // skip processing the PING message further
                 }
@@ -84,6 +86,7 @@ fn main() {
                 let ping_command = PingCommand;
                 let kill_command = KillCommand;
                 let invade_command = InvadeCommand;
+                //let test_command = TestCommand;
                 let ai = Ai;
 
                 // ADMIN MODULES
@@ -91,7 +94,7 @@ fn main() {
                     let parts: Vec<&str> = message.splitn(2, ' ').collect(); // Check if user is admin_user
                     let username = parts[0].trim_start_matches(':').split("!").next().unwrap();
                     if !admin_users.contains(&username.to_string()) {
-                        println!("[!] UNAUTHORIZED: {}", username.red());
+                        println!("{} {}","[!] UNAUTHORIZED:".bold().clear().on_red(), username.red().bold());
                         continue; // ...
                     }
                     if message.contains(":%ping") {
@@ -106,7 +109,11 @@ fn main() {
                         for response in invade_command.handle(message) {
                             ssl_stream.write_all(response.as_bytes()).unwrap();
                         }
-                    } 
+                    } //else if message.contains(":%test") {
+                      //  for response in test_command.handle(message) {
+                      //      ssl_stream.write_all(response.as_bytes()).unwrap();
+                      //  }
+                    //} 
                 }
 
                 // Check if the message is user and respond via ai
