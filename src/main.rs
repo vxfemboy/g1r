@@ -14,12 +14,13 @@ mod modules {
     pub mod ai;
     pub mod invade;
     pub mod test;
+    pub mod ai_invade;
 }
 
 use modules::ai::Ai; // FIX THIS BS
 use modules::ping::PingCommand;
 use modules::invade::InvadeCommand;
-//use modules::test::TestCommand;
+//use modules::ai_invade::AiInvadeCommand;
 use modules::kill::KillCommand; // ...
 use crate::modules::Command;
 
@@ -86,6 +87,8 @@ fn main() {
                 let ping_command = PingCommand;
                 let kill_command = KillCommand;
                 let invade_command = InvadeCommand;
+                //let ai_invade_command = AiInvadeCommand;
+
                 //let test_command = TestCommand;
                 let ai = Ai;
 
@@ -109,8 +112,8 @@ fn main() {
                         for response in invade_command.handle(message) {
                             ssl_stream.write_all(response.as_bytes()).unwrap();
                         }
-                    } //else if message.contains(":%test") {
-                      //  for response in test_command.handle(message) {
+                    } //else if message.contains(":%aiinvade") {
+                      //  for response in ai_invade_command.handle(message) {
                       //      ssl_stream.write_all(response.as_bytes()).unwrap();
                       //  }
                     //} 

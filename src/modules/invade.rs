@@ -13,6 +13,7 @@ struct Config {
     invaders: Vec<String>,
     server: String,
     port: u16,
+    
 }
 
 pub struct InvadeCommand;
