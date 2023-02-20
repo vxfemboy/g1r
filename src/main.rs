@@ -14,7 +14,7 @@ mod modules {
     pub mod ai;
     pub mod invade;
     pub mod test;
-    pub mod ai_invade;
+    //pub mod ai_invade;
 }
 
 use modules::ai::Ai; // FIX THIS BS

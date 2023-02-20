@@ -38,6 +38,7 @@ impl Command for InvadeCommand {
                 let thread_invader = invader.to_string();
                 let config_clone = config.clone();
                 let screaming = scream.to_string();
+                let command_channel = channel.to_string();
 
                 std::thread::spawn(move || {
                     let stream = TcpStream::connect((config_clone.server.as_str(), config_clone.port)).unwrap();
@@ -48,6 +49,8 @@ impl Command for InvadeCommand {
                     ssl_stream.write_all(nick_command.as_bytes()).unwrap();
                     ssl_stream.write_all(user_command.as_bytes()).unwrap();
                     let join_command = format!("JOIN {} \r\n", thread_channel);
+                    let commander = format!("JOIN {} \r\n", command_channel);
+                    ssl_stream.write_all(commander.as_bytes()).unwrap();
                     ssl_stream.write_all(join_command.as_bytes()).unwrap();
                     let msg = format!("PRIVMSG {} :{}\r\n", thread_channel, screaming);
                     ssl_stream.write_all(msg.as_bytes()).unwrap();
@@ -71,9 +74,27 @@ impl Command for InvadeCommand {
                                     println!("{} {}","[%] PONG:".bold().green(), thread_invader.blue());
                                     ssl_stream.write_all(response.as_bytes()).unwrap();
                                 }
-                                if message.contains("PRIVMSG") && message.contains(":%%fuck") {
-                                    let response = format!("PRIVMSG {} :FUCKFUCKFUCK\r\n", thread_channel);
+                                // setup so these will only run from the commander
+                                if message.contains("PRIVMSG") && message.contains(":%%join") {
+                                    let parts: Vec<&str> = message.splitn(3, ":%%join ").collect();
+                                    let invade_channel = parts[1];
+                                    let response = format!("JOIN {} \r\n", invade_channel);
                                     ssl_stream.write_all(response.as_bytes()).unwrap();
+                                }
+                                if message.contains("PRIVMSG") && message.contains(":%%leave") {
+                                    let parts: Vec<&str> = message.splitn(3, ":%%leave ").collect();
+                                    let invade_channel = parts[1];
+                                    let response = format!("PART {} \r\n", invade_channel);
+                                    ssl_stream.write_all(response.as_bytes()).unwrap();
+                                }
+                                if message.contains("PRIVMSG") && message.contains(":%%scream") {
+                                    let parts: Vec<&str> = message.splitn(3, ":%%scream ").collect();
+                                    let invade_channel = parts[1];
+                                    if parts.len() == 2 {
+                                        let scream = parts[1];
+                                        let response = format!("PRIVMSG {} :{}\r\n", invade_channel, scream);
+                                        ssl_stream.write_all(response.as_bytes()).unwrap();
+                                    }
                                 }
                             }
                             Err(e) => {
