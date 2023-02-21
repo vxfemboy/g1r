@@ -2,13 +2,17 @@ nick = "g1r"
 server = "ircd.chat"
 port = 6697
 password = ""
-channels = [ "#tcpdirect", "#macros", "#b0tsh0p" ]
-admin_users = ["s4d", "s4d[m]"]
+channels = [ "#tcpdirect", "#macros", "#b0tsh0p" ] #add key access 
+admin_users = ["s4d", "s4d[m]", "g"] # add host identification
 ignore_users = ["maple", "aibird", "professorOak", "van"]
 openai = "sk-"
 model = "text-davinci-003"
 accents = "funny, completely insane, and hyperactive"  
 personalities = "GIR from Invader Zim"
+
+proxy_server = "127.0.0.1"
+proxy_port = 9050
+
 # INVADER SETTINGS
 invaders = ["d1b", "z1m", "t4k", "m3mbr4n3", "g4z", "4l4n", "m1yuk1", "purpl3", "r3d", "5p0rk", "t3nn", "l4rb", "ch1nn", "d00ky", "3l", "fl0rb3", "g00ch", "gr4p4", "gr00t", "k00t", "k1m", "krunk", "l4dn4r", "n3n", "p3st0", "p00t"]
 proxy_list = "./proxies.txt"

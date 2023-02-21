@@ -5,6 +5,8 @@ use openssl::ssl::{SslMethod, SslConnector};
 use toml::Value;
 use serde::Deserialize;
 use colored::*;
+
+
 mod modules {
     pub trait Command {
         fn handle(&self, message: &str) -> Vec<String>;
@@ -33,6 +35,7 @@ struct Config {
     channels: Vec<String>,
     admin_users: Vec<String>,
     ignore_users: Vec<String>,
+    
 }
 
 fn main() {

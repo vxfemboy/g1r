@@ -21,7 +21,7 @@ impl Command for Ai {
         let mut responses = Vec::new();
         let config_str = std::fs::read_to_string("config.toml").unwrap();
         let config_value = config_str.parse::<Value>().unwrap();
-        let config: Config = config_value.try_into().unwrap();
+        let config: Config = config_value.try_into().unwrap(); // respond to name with and without leet VVV
         if message.starts_with(":") && message.contains("PRIVMSG ") && message.contains(&config.nick) { 
             let channel = message.split("PRIVMSG ").nth(1).and_then(|s| s.splitn(2, ' ').next()).unwrap(); // set the response to varible
             let user_message = format!("The following is a chat log:\n{}\nRespond {} as you are chatting as {}: \n\n", 
