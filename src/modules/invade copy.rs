@@ -6,7 +6,7 @@ use openssl::ssl::{SslConnector, SslMethod};
 use serde::Deserialize;
 use toml::{Value, to_string};
 use colored::*;
-use socks::*;
+
 // add better error handling
 // add ai invasion
 // add proxy support
@@ -16,9 +16,7 @@ struct Config {
     //invaders: Vec<String>,
     server: String,
     port: u16,
-    
-    proxy_server: String,
-    proxy_port: u16,
+
     
 }
 
@@ -47,13 +45,11 @@ impl Command for InvadeCommand {
                 let screaming = scream.to_string();
                 let command_channel = channel.to_string();
                 let thread_invader = random_word::gen(); // change to leetspeak on nick collision
-                
-                std::thread::spawn(move || {
 
+                std::thread::spawn(move || {
                     let stream = TcpStream::connect((config_clone.server.as_str(), config_clone.port)).unwrap();
                     let connector = SslConnector::builder(SslMethod::tls()).unwrap().build();
                     let mut ssl_stream = connector.connect(config_clone.server.as_str(), stream).unwrap();
-
                     let nick_command = format!("NICK {}\r\n", thread_invader);
                     let user_command = format!("USER {} 0 * :{}\r\n", thread_invader, thread_invader);
                     ssl_stream.write_all(nick_command.as_bytes()).unwrap();

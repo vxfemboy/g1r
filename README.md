@@ -44,7 +44,7 @@
 - `%ping`: Send this command to G.1.R and he'll respond back with "pong" and the time it took. Because why not?
 - `%kill`: Do you hate your bot companion and want to end his miserable existence? Just type this command and he'll self-destruct, leaving you alone with your conscience (and your loneliness).
 - `%invade 5 #channel SCREAM`: Do you want to summon the Invaders to a specific channel? This command will do just that, plus a chance to let out your deepest screams of despair. 5 being the number of invaders to join!
-`%%scream #channel SCREAM`: In case the invaders weren't enough to scare off your enemies, use this command to make them hear your battle cry across the IRC lands.
+- `%%scream #channel SCREAM`: In case the invaders weren't enough to scare off your enemies, use this command to make them hear your battle cry across the IRC lands.
 - `%%join #channel`: More bots, more fun! Tell G.1.R to join the party in a specific channel and watch the madness unfold.
 - `%%leave #channel`: Tired of all the chaos? Use this command to make the bots leave the channel and leave you in peace (or in silence, at least).
 
