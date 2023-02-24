@@ -34,6 +34,8 @@
 ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠈⢿⣿⡿⠀⠀⠙⣿⣿⣿⠀⠀⠀⠀⠀⠀⠙⠿⠿⠶⠶⠶⠶⠶⠾⠟⠋⠀⠀⠀⠀⠀
 ```
 
+this is the dev branch
+
 ## FEATURES
 
 - OpenAI GPT-3 integration: mention G.1.R and he'll respond with AI-generated wisdom (or nonsense, depending on how you see it).
