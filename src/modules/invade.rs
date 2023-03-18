@@ -6,7 +6,11 @@ use openssl::ssl::{SslConnector, SslMethod};
 use serde::Deserialize;
 use toml::{Value, to_string};
 use colored::*;
-use socks::*;
+
+//use anyhow::Result;
+//use socks5_proxy::{client, Addr};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
 // add better error handling
 // add ai invasion
 // add proxy support

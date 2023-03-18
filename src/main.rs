@@ -6,6 +6,9 @@ use toml::Value;
 use serde::Deserialize;
 use colored::*;
 
+use crate::modules::Command;
+
+
 
 mod modules {
     pub trait Command {
@@ -16,15 +19,14 @@ mod modules {
     pub mod ai;
     pub mod invade;
     pub mod test;
-    //pub mod ai_invade;
+    pub mod aicode;
 }
 
 use modules::ai::Ai; // FIX THIS BS
 use modules::ping::PingCommand;
 use modules::invade::InvadeCommand;
-//use modules::ai_invade::AiInvadeCommand;
+use modules::aicode::AiCode;
 use modules::kill::KillCommand; // ...
-use crate::modules::Command;
 
 #[derive(Deserialize)]
 struct Config {
@@ -37,7 +39,6 @@ struct Config {
     ignore_users: Vec<String>,
     
 }
-
 fn main() {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -48,10 +49,11 @@ fn main() {
     let config_str = std::fs::read_to_string("config.toml").unwrap();
     let config_value = config_str.parse::<Value>().unwrap();
     let config: Config = config_value.try_into().unwrap();
+
+
     // GIVE THE SERVER A SLOPPPY SPAM OF RETARDEDNESS
     let stream = TcpStream::connect(format!("{}:{}", config.server, config.port)).unwrap(); 
     let connector = SslConnector::builder(SslMethod::tls()).unwrap().build();
-    // DONT DO DRUGS YOU WILL END UP LIKE ME
     let mut ssl_stream = connector.connect(&config.server, stream).unwrap();
     let nick_command = format!("NICK {}_\r\n", config.nick); //setup passwords
     let user_command = format!("USER {} 0 * :{}\r\n", config.nick, config.nick);
@@ -90,7 +92,7 @@ fn main() {
                 let ping_command = PingCommand;
                 let kill_command = KillCommand;
                 let invade_command = InvadeCommand;
-                //let ai_invade_command = AiInvadeCommand;
+                let aicode = AiCode;
 
                 //let test_command = TestCommand;
                 let ai = Ai;
@@ -115,11 +117,11 @@ fn main() {
                         for response in invade_command.handle(message) {
                             ssl_stream.write_all(response.as_bytes()).unwrap();
                         }
-                    } //else if message.contains(":%aiinvade") {
-                      //  for response in ai_invade_command.handle(message) {
-                      //      ssl_stream.write_all(response.as_bytes()).unwrap();
-                      //  }
-                    //} 
+                    } else if message.contains(":%code") {
+                        for response in aicode.handle(message) {
+                            ssl_stream.write_all(response.as_bytes()).unwrap();
+                        }
+                    } 
                 }
 
                 // Check if the message is user and respond via ai
