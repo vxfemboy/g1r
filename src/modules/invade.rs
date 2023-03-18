@@ -7,6 +7,7 @@ use serde::Deserialize;
 use toml::{Value, to_string};
 use colored::*;
 use leetspeak;
+use regex::Regex;
 
 //use anyhow::Result;
 //use socks5_proxy::{client, Addr};
@@ -30,6 +31,7 @@ impl Command for InvadeCommand {
         let mut response = vec![];
 
         if message.contains("PRIVMSG") && message.contains(":%invade") {
+            
             let parts: Vec<&str> = message.split_whitespace().collect();
             let num_invaders = parts[4].parse::<u32>().unwrap_or(1) as usize;
             let channel = parts[2];
@@ -109,10 +111,10 @@ impl Command for InvadeCommand {
                                         ssl_stream.write_all(response.as_bytes()).unwrap();
                                     }
                                     if message.contains("PRIVMSG") && message.contains(":%%scream") {
-                                        let parts: Vec<&str> = message.splitn(3, ":%%scream ").collect();
-                                        let invade_channel = parts[1];
-                                        if parts.len() == 2 {
-                                            let scream = parts[1];
+                                        let re = Regex::new(r#"%%scream\s+([^"]+?)\s+"([^"]*?)"\s*"#).unwrap();
+                                        if let Some(captures) = re.captures(message) {
+                                            let invade_channel = captures.get(1).map_or("", |m| m.as_str());
+                                            let scream = captures.get(2).map_or("", |m| m.as_str());
                                             let response = format!("PRIVMSG {} :{}\r\n", invade_channel, scream);
                                             ssl_stream.write_all(response.as_bytes()).unwrap();
                                         }

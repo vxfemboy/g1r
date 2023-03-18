@@ -53,7 +53,7 @@ async fn ai(user_message: &str, username: &str, channel: &str, config: &Config) 
         .messages([
             ChatCompletionRequestMessageArgs::default()
                 .role(Role::System)
-                .content(format!("Respond {} as you are chatting as {}, The following is a chat message to you from {} dont mention that you are who you are they can see that:", config.accents, config.personalities, username))
+                .content(format!("Respond {} as you are chatting as {}, {} sent you a message, dont respond for them:", config.accents, config.personalities, username))
                 .build()
                 .unwrap(),
             ChatCompletionRequestMessageArgs::default()
@@ -69,8 +69,11 @@ async fn ai(user_message: &str, username: &str, channel: &str, config: &Config) 
     let response = client.chat().create(request).await.unwrap();
     let response_text = response.choices.first().unwrap().message.content.trim().to_string();
     let regex = Regex::new(r#""|[gG][1iI][rR]\s"#).unwrap(); // THIS IS FUCKING UP EVERYTHING
+    let regex2 = Regex::new(r#""|[gG][1iI][rR]:\s"#).unwrap(); // THIS IS FUCKING UP EVERYTHING
 
     let response_text = regex.replace_all(&response_text, "").trim().to_string();
+    let response_text = regex2.replace_all(&response_text, "").trim().to_string();
+
     println!("{}", response_text);
     let response_lines = response_text.split("\n").filter(|line| !line.trim().is_empty());
     let mut responses = Vec::new();
