@@ -6,6 +6,7 @@ use openssl::ssl::{SslConnector, SslMethod};
 use serde::Deserialize;
 use toml::{Value, to_string};
 use colored::*;
+use leetspeak;
 
 //use anyhow::Result;
 //use socks5_proxy::{client, Addr};
@@ -20,10 +21,6 @@ struct Config {
     //invaders: Vec<String>,
     server: String,
     port: u16,
-    
-    proxy_server: String,
-    proxy_port: u16,
-    
 }
 
 pub struct InvadeCommand;
@@ -50,6 +47,7 @@ impl Command for InvadeCommand {
                 let config_clone = config.clone();
                 let screaming = scream.to_string();
                 let command_channel = channel.to_string();
+
                 let thread_invader = random_word::gen(); // change to leetspeak on nick collision
                 
                 std::thread::spawn(move || {
@@ -87,6 +85,11 @@ impl Command for InvadeCommand {
                                     let response = message.replace("PING", "PONG");
                                     println!("{} {}","[%] PONG:".bold().green(), thread_invader.blue());
                                     ssl_stream.write_all(response.as_bytes()).unwrap();
+                                }
+                                if message.starts_with("433") { // Numeric reply for nickname in use
+                                    let leet_nick = leetspeak::translate(&thread_invader);
+                                    let nick_command = format!("NICK {}\r\n", leet_nick);
+                                    ssl_stream.write_all(nick_command.as_bytes()).unwrap();
                                 }
                             // turn to mods
                                 // setup so these will only run from the server admin to avoid handle/host conflicts 
