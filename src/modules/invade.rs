@@ -11,6 +11,8 @@ use regex::Regex;
 
 //use anyhow::Result;
 //use socks5_proxy::{client, Addr};
+//  use tokio::net::TcpStream;
+use tokio_native_tls::{TlsConnector, TlsStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 // add better error handling
@@ -25,6 +27,7 @@ struct Config {
 }
 
 pub struct InvadeCommand;
+
 
 impl Command for InvadeCommand {
     fn handle(&self, message: &str) -> Vec<String> {

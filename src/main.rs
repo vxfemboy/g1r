@@ -40,7 +40,7 @@ struct Config {
     
 }
 fn main() {
-    let rt = tokio::runtime::Builder::new_multi_thread()
+    let _rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
         .unwrap();
@@ -117,11 +117,7 @@ fn main() {
                         for response in invade_command.handle(message) {
                             ssl_stream.write_all(response.as_bytes()).unwrap();
                         }
-                    } else if message.contains(":%code") {
-                        for response in aicode.handle(message) {
-                            ssl_stream.write_all(response.as_bytes()).unwrap();
-                        }
-                    } 
+                    }
                 }
 
                 // Check if the message is user and respond via ai
@@ -141,7 +137,13 @@ fn main() {
                         ssl_stream.write_all(response.as_bytes()).unwrap();
                     }
 
-                }
+                } 
+                else if message.contains(":%code") {
+                    for response in aicode.handle(message) {
+                        ssl_stream.write_all(response.as_bytes()).unwrap();
+                    }
+
+                }  
 
             },
             Err(e) => {

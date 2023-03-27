@@ -53,7 +53,7 @@ async fn ai(user_message: &str, username: &str, channel: &str, config: &Config) 
         .messages([
             ChatCompletionRequestMessageArgs::default()
                 .role(Role::System)
-                .content(format!("Respond {} as you are chatting as {}, {} sent you a message, dont respond for them:", config.accents, config.personalities, username))
+                .content(format!("Respond {} as you are chatting as {}, {} sent the following, respond as you should:", config.accents, config.personalities, username))
                 .build()
                 .unwrap(),
             ChatCompletionRequestMessageArgs::default()
