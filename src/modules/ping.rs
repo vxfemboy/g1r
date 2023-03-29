@@ -3,7 +3,7 @@ use std::time::{Instant};
 use crate::modules::Command;
 pub struct PingCommand;
 impl Command for PingCommand {
-    fn handle(&self, message: &str) -> Vec<String> {
+    fn handle(&mut self, message: &str) -> Vec<String> {
         let mut response = vec![];
                 
         if message.contains("PRIVMSG") && message.contains(":%ping") {

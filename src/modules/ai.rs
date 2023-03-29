@@ -16,7 +16,7 @@ struct Config {
 pub struct Ai;
 
 impl Command for Ai {
-    fn handle(&self, message: &str) -> Vec<String> {
+    fn handle(&mut self, message: &str) -> Vec<String> {
         let mut responses = Vec::new();
         let config_str = std::fs::read_to_string("config.toml").unwrap();
         let config_value = config_str.parse::<Value>().unwrap();

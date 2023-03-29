@@ -1,8 +1,8 @@
 nick = "g1r"
 server = "ircd.chat"
 port = 6697
-password = "mine"
-channels = [ "#s4d", "wiki", "#emo", "#tcpdirect", "#macros", "#b0tsh0p" ] #add key access 
+password = ""
+channels = [ "#sad", "#s4d", "wiki", "#emo", "#tcpdirect", "#macros", "#b0tsh0p" ] #add key access 
 admin_users = ["s4d", "sad", "g", "d", "h3x", "kayos", "moony"] # add host identification
 ignore_users = ["maple", "aibird", "professorOak", "van"]
 openai = "sk-"

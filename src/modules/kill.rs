@@ -3,7 +3,7 @@ use crate::modules::Command;
 
 pub struct KillCommand;
 impl Command for KillCommand {
-    fn handle(&self, message: &str) -> Vec<String> {
+    fn handle(&mut self, message: &str) -> Vec<String> {
         let mut response = vec![];
                 
         if message.contains("PRIVMSG") && message.contains(":%kill") {

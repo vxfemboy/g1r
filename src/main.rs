@@ -12,7 +12,7 @@ use crate::modules::Command;
 
 mod modules {
     pub trait Command {
-        fn handle(&self, message: &str) -> Vec<String>;
+        fn handle(&mut self, message: &str) -> Vec<String>;
     }
     pub mod ping;
     pub mod kill;
@@ -56,6 +56,7 @@ fn main() {
     let connector = SslConnector::builder(SslMethod::tls()).unwrap().build();
     let mut ssl_stream = connector.connect(&config.server, stream).unwrap();
     let nick_command = format!("NICK {}_\r\n", config.nick); //setup passwords
+    
     let user_command = format!("USER {} 0 * :{}\r\n", config.nick, config.nick);
     ssl_stream.write_all(nick_command.as_bytes()).unwrap();
     ssl_stream.write_all(user_command.as_bytes()).unwrap();
@@ -88,14 +89,15 @@ fn main() {
                     continue; // skip processing the PING message further
                 }
 
+
                 // MODULES
-                let ping_command = PingCommand;
-                let kill_command = KillCommand;
-                let invade_command = InvadeCommand;
-                let aicode = AiCode;
+                let mut ping_command = PingCommand;
+                let mut kill_command = KillCommand;
+                let mut invade_command = InvadeCommand::new();
+                let mut aicode = AiCode;
 
                 //let test_command = TestCommand;
-                let ai = Ai;
+                let mut ai = Ai;
 
                 // ADMIN MODULES
                 if message.starts_with(":") && message.contains(" :%") {
@@ -114,6 +116,10 @@ fn main() {
                             ssl_stream.write_all(response.as_bytes()).unwrap();
                         }
                     } else if message.contains(":%invade") {
+                        for response in invade_command.handle(message) {
+                            ssl_stream.write_all(response.as_bytes()).unwrap();
+                        }
+                    } else if message.contains(":%%kill") {
                         for response in invade_command.handle(message) {
                             ssl_stream.write_all(response.as_bytes()).unwrap();
                         }
