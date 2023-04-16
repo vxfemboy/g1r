@@ -71,4 +71,3 @@ Pro tip: When you use the `%invade 5 #channel` command, G.1.R will set up that c
 - [ ] Key rotation: To avoid API attempts from stopping the invasion.
 
 So what are you waiting for? Join us in our quest for world domination, and let's make Invader Zim proud!
-t
