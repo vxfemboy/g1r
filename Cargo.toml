@@ -6,8 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-openssl = "0.10.45"
-async-openai = "0.9.3"
+openssl = "0.10.2"
+async-openai = "0.10.2"
 tokio = { version = "1.23.0", features = ["full"] }
 rand = "0.8.4"
 regex = "1.7.1"
@@ -22,6 +22,8 @@ leetspeak = "0.2.0"
 irc = "0.15.0"
 futures = "0.3.27"
 futures-util = "0.3.27"
+
+base64 = "0.21"
 
 lazy_static = "1.4.0"
 anyhow = "1.0.70"
