@@ -1,151 +1,78 @@
-use std::io::prelude::*;
-use std::net::TcpStream;
-use std::io::Write;
-use openssl::ssl::{SslMethod, SslConnector};
-use toml::Value;
-use serde::Deserialize;
 use colored::*;
-
-
-mod modules {
-    pub trait Command {
-        fn handle(&self, message: &str) -> Vec<String>;
-    }
-    pub mod ping;
-    pub mod kill;
-    pub mod ai;
-    pub mod invade;
-    pub mod test;
-    //pub mod ai_invade;
-}
-
-use modules::ai::Ai; // FIX THIS BS
-use modules::ping::PingCommand;
-use modules::invade::InvadeCommand;
-//use modules::ai_invade::AiInvadeCommand;
-use modules::kill::KillCommand; // ...
-use crate::modules::Command;
+use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
+use serde::Deserialize;
+use std::fs;
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader, BufWriter};
+use tokio::net::TcpStream;
+use tokio_openssl::SslStream;
+use std::pin::Pin;
 
 #[derive(Deserialize)]
 struct Config {
     server: String,
     port: u16,
-    nick: String,
-    password: String,
-    channels: Vec<String>,
-    admin_users: Vec<String>,
-    ignore_users: Vec<String>,
-    
+    use_ssl: bool,
+    nickname: String,
+    channel: String,
 }
 
-fn main() {
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-        .unwrap();
+#[tokio::main]
+async fn main() -> Result<(), Box<(dyn std::error::Error)>> {
+    println!("Loading Config...");
+    let config_contents = fs::read_to_string("config.toml").expect("Error reading config.toml");
+    let config: Config = toml::from_str(&config_contents).expect("Error parsing config.toml");
+    println!("Config loaded!");
 
-    // LOAD CONFIG
-    let config_str = std::fs::read_to_string("config.toml").unwrap();
-    let config_value = config_str.parse::<Value>().unwrap();
-    let config: Config = config_value.try_into().unwrap();
-    // GIVE THE SERVER A SLOPPPY SPAM OF RETARDEDNESS
-    let stream = TcpStream::connect(format!("{}:{}", config.server, config.port)).unwrap(); 
-    let connector = SslConnector::builder(SslMethod::tls()).unwrap().build();
-    // DONT DO DRUGS YOU WILL END UP LIKE ME
-    let mut ssl_stream = connector.connect(&config.server, stream).unwrap();
-    let nick_command = format!("NICK {}_\r\n", config.nick); //setup passwords
-    let user_command = format!("USER {} 0 * :{}\r\n", config.nick, config.nick);
-    ssl_stream.write_all(nick_command.as_bytes()).unwrap();
-    ssl_stream.write_all(user_command.as_bytes()).unwrap();
-    let identify_command = format!("PRIVMSG NickServ :IDENTIFY {} {}\r\n", config.nick, config.password);
-    ssl_stream.write(identify_command.as_bytes()).unwrap();
-    let channels = config.channels.join(",");
-    let join_command = format!("JOIN {}\r\n", channels);
-    
-    let admin_users = config.admin_users; // ADMINS
-    let ignored_users = config.ignore_users; // IGNORED
-// ... 
-    ssl_stream.write_all(join_command.as_bytes()).unwrap();
+    let addr = format!("{}:{}", config.server, config.port);
+    println!("Connecting to {}...", addr.green());
+    let tcp_stream = TcpStream::connect(&addr).await.unwrap();
+    println!("Connected to {}!", addr.green());
 
-    let mut buf = [0; 512];
-    loop {
-        match ssl_stream.read(&mut buf) {
-            Ok(0) => break,
-            Ok(n) => {
-                let received = String::from_utf8_lossy(&buf[0..n]);
-                let message = received.trim();
+    if config.use_ssl {
+        println!("Establishing SSL connection...");
+        let mut connector = SslConnector::builder(SslMethod::tls()).unwrap().build().configure().unwrap().into_ssl(&addr).unwrap();
+        connector.set_verify(SslVerifyMode::NONE);
+        let mut ssl_stream = SslStream::new(connector, tcp_stream).unwrap();
 
-                //debug chat 
-                println!("{} {}","[%] DEBUG:".bold().green(), received.purple());
-
-
-                // RESPOND TO PINGS
-                if message.starts_with("PING") {
-                    println!("{} {}","[%] PONG:".bold().green(), config.nick.blue()); // DEBUG
-                    ssl_stream.write_all("PONG ircd.chat\r\n".as_bytes()).unwrap();
-                    continue; // skip processing the PING message further
-                }
-
-                // MODULES
-                let ping_command = PingCommand;
-                let kill_command = KillCommand;
-                let invade_command = InvadeCommand;
-                //let ai_invade_command = AiInvadeCommand;
-
-                //let test_command = TestCommand;
-                let ai = Ai;
-
-                // ADMIN MODULES
-                if message.starts_with(":") && message.contains(" :%") {
-                    let parts: Vec<&str> = message.splitn(2, ' ').collect(); // Check if user is admin_user
-                    let username = parts[0].trim_start_matches(':').split("!").next().unwrap();
-                    if !admin_users.contains(&username.to_string()) {
-                        println!("{} {}","[!] UNAUTHORIZED:".bold().clear().on_red(), username.red().bold());
-                        continue; // ...
-                    }
-                    if message.contains(":%ping") {
-                        for response in ping_command.handle(message) {
-                            ssl_stream.write_all(response.as_bytes()).unwrap();
-                        }
-                    } else if message.contains(":%kill") {
-                        for response in kill_command.handle(message) {
-                            ssl_stream.write_all(response.as_bytes()).unwrap();
-                        }
-                    } else if message.contains(":%invade") {
-                        for response in invade_command.handle(message) {
-                            ssl_stream.write_all(response.as_bytes()).unwrap();
-                        }
-                    } //else if message.contains(":%aiinvade") {
-                      //  for response in ai_invade_command.handle(message) {
-                      //      ssl_stream.write_all(response.as_bytes()).unwrap();
-                      //  }
-                    //} 
-                }
-
-                // Check if the message is user and respond via ai
-                else if message.starts_with(":") && message.contains("PRIVMSG ") && message.contains(&config.nick) { //modify for on mention 
-                    let channel = message.split("PRIVMSG ").nth(1).and_then(|s| s.splitn(2, ' ').next()).unwrap();
-                    if !channels.contains(&channel) {
-                        continue;
-                    }
-                    // extract the username from the first part and check if ignored
-                    let parts: Vec<&str> = message.splitn(2, ' ').collect(); // split the message into two parts at the first space
-                    let username = parts[0].trim_start_matches(':').split("!").next().unwrap();
-                    if ignored_users.contains(&username.to_string()) {
-                        println!("[!] IGNORED: {}", username.red()); 
-                        continue;
-                    }
-                    for response in ai.handle(message, ) {
-                        ssl_stream.write_all(response.as_bytes()).unwrap();
-                    }
-
-                }
-
-            },
+        // Perform the SSL handshake
+        match Pin::new(&mut ssl_stream).connect().await {
+            Ok(_) => println!("SSL connection established!"),
             Err(e) => {
-                println!("[!] ERROR: {}", e);
-                break;
-            },
+                println!("Error establishing SSL connection: {:?}", e);
+                return Err(Box::new(e) as Box<dyn std::error::Error>);
+            }
+        };
+
+        println!("Sending NICK and USER commands...");
+        ssl_stream.write_all(format!("NICK {}\r\n", config.nickname).as_bytes()).await.unwrap();
+        ssl_stream.write_all(format!("USER {} 0 * :{}\r\n", config.nickname, config.nickname).as_bytes()).await.unwrap();
+        ssl_stream.write_all(format!("JOIN {}\r\n", config.channel).as_bytes()).await.unwrap();
+
+
+        let (read_half, write_half) = tokio::io::split(ssl_stream);
+
+        // split the stream and then transfer this for non-ssl
+        let mut reader = BufReader::new(read_half);
+        let mut writer = BufWriter::new(write_half);
+        let mut lines = reader.lines();
+
+        while let Some(result) = lines.next_line().await.unwrap() {
+
+            let received = String::from_utf8_lossy(result.as_bytes()).trim().to_string();
+            println!("{} {}","[%] DEBUG:".bold().green(), received.purple());
+
+            let message = received.trim();
+            if message.starts_with("PING") {
+                println!("Sending PONG...");
+                let response = message.replace("PING", "PONG");
+                println!("{} {}","[%] PONG:".bold().green(), config.nickname.blue());
+                writer.write_all(response.as_bytes()).await.unwrap();
+                continue;
+            }
         }
+    } else {
+        println!("Non-SSL connection not implemented.");
     }
+
+    Ok(())
 }
