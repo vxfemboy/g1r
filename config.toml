@@ -2,5 +2,7 @@ server = "irc.supernets.org"
 port = 6697
 use_ssl = true
 nickname = "g1r"
-channel = "#superbowl"
-
+channel = "#dev"
+sasl_username = "g1r"
+sasl_password = "fuckyou.lol"
+capabilities = ["sasl"]

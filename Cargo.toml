@@ -13,6 +13,7 @@ tokio-native-tls = "0.3.1"
 native-tls = "0.2.11"
 rand = "0.8.5"
 toml = "0.8.10"
+base64 = "0.22.0"
 serde = { version = "1.0.197", features = ["derive"] }
 colored = "2.1.0"
 futures = "0.3.30"
