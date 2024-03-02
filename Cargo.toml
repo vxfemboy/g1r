@@ -7,11 +7,11 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.36.0", features = ["full"] }
-tokio-openssl = "0.6.4"
 tokio-socks = "0.5.1"
-openssl = "0.10.64"
+tokio-rustls = "0.25.0"
+tokio-native-tls = "0.3.1"
+native-tls = "0.2.11"
 rand = "0.8.5"
-regex = "1.10.3"
 toml = "0.8.10"
 serde = { version = "1.0.197", features = ["derive"] }
 colored = "2.1.0"
