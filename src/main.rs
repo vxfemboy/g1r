@@ -22,8 +22,11 @@ struct Config {
 
 mod mods {
     pub mod sasl;
+    pub mod sed;
 }
 use mods::sasl::{start_sasl_auth, handle_sasl_messages};
+use mods::sed::{SedCommand, MessageBuffer};
+
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 12)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -48,6 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }).await.unwrap();
     Ok(())
 }
+
 /// Load the config file
 fn loaded_config() -> Result<Config, Box<dyn std::error::Error>> {
     let config_contents = fs::read_to_string("config.toml")?;
@@ -67,16 +71,15 @@ async fn tls_exec(config: &Config, tcp_stream: TcpStream) -> Result<tokio_native
 async fn handler(tls_stream: tokio_native_tls::TlsStream<TcpStream>, config: Config) -> Result<(), Box<dyn std::error::Error>> {
     let (reader, writer) = split(tls_stream);
     let (tx, rx) = mpsc::channel(1000);
-
-
     
     let read_task = tokio::spawn(async move {
         readmsg(reader, tx).await;
     });
 
+    let message_buffer = MessageBuffer::new(1000);
 
     let write_task = tokio::spawn(async move {
-        writemsg(writer, rx, &config).await; 
+        writemsg(writer, rx, &config, message_buffer).await; 
     });
 
     let _ = tokio::try_join!(read_task, write_task);
@@ -104,10 +107,10 @@ async fn readmsg(mut reader: tokio::io::ReadHalf<tokio_native_tls::TlsStream<Tcp
 
 
 static SASL_AUTH: AtomicBool = AtomicBool::new(false);
+
 /// Write messages to the server
-async fn writemsg(mut writer: tokio::io::WriteHalf<tokio_native_tls::TlsStream<TcpStream>>, mut rx: tokio::sync::mpsc::Receiver<String>, config: &Config) {
-    // sasl auth 
-    //let capabilities = config.capabilities.clone();
+async fn writemsg(mut writer: tokio::io::WriteHalf<tokio_native_tls::TlsStream<TcpStream>>, mut rx: tokio::sync::mpsc::Receiver<String>, config: &Config, mut message_buffer: MessageBuffer) {
+
     let username = config.sasl_username.clone().unwrap();
     let password = config.sasl_password.clone().unwrap();
     let nickname = config.nickname.clone();
@@ -121,12 +124,7 @@ async fn writemsg(mut writer: tokio::io::WriteHalf<tokio_native_tls::TlsStream<T
         nickme(&mut writer, &nickname).await.unwrap();
         writer.flush().await.unwrap();
     }
-    //writer.flush().await.unwrap();
-    //let msg = rx.recv().await.unwrap();
-    //let msg = msg.trim();
-    //let parts = msg.split(' ').collect::<Vec<&str>>();
 
-    // THIS NEEDS TO BE REBUILT TO BE MORE MODULAR AND SECURE 
     while let Some(msg) = rx.recv().await {
         let msg = msg.trim();
         if msg.is_empty() {
@@ -136,8 +134,6 @@ async fn writemsg(mut writer: tokio::io::WriteHalf<tokio_native_tls::TlsStream<T
         let serv = parts.first().unwrap_or(&"");
         let cmd = parts.get(1).unwrap_or(&"");
 
-
-        
         println!("{} {} {} {} {}", "DEBUG:".bold().yellow(), "serv:".bold().green(), serv.purple(), "cmd:".bold().green(), cmd.purple());
         if *serv == "PING" { 
             let response = msg.replace("PING", "PONG") + "\r\n";
@@ -164,10 +160,23 @@ async fn writemsg(mut writer: tokio::io::WriteHalf<tokio_native_tls::TlsStream<T
         }
         if *cmd == "PRIVMSG" {
             let channel = parts[2];
-            let user = parts[0];
-            let host = user.split_at(user.find('!').unwrap());
-            let msg = parts[3..].join(" ").replace(':', "");
-            println!("{}{}{} {}{} {} {} {}", "[".green().bold(), ">".yellow().bold(), "]".green().bold(), "PRIVMSG:".bold().yellow(), ":".bold().green(), channel.yellow(), user.blue(), msg.purple());
+            let user = parts[0].strip_prefix(':').unwrap().split_at(parts[0].find('!').unwrap()).0;
+            let host = parts[0].split_at(parts[0].find('!').unwrap()).1;
+            let msg_content = parts[3..].join(" ").replace(':', "");
+            println!("{} {} {} {} {} {} {}", "DEBUG:".bold().yellow(), "channel:".bold().green(), channel.purple(), "user:".bold().green(), host.purple(), "msg:".bold().green(), msg_content.purple());
+            // sed
+            if msg_content.starts_with("s/") {
+                println!("Sed command detected");
+                if let Some(sed_command) = SedCommand::parse(&msg_content) {
+                    if let Some(response) = message_buffer.apply_sed_command(&sed_command) {
+                        writer.write_all(format!("PRIVMSG {} :{}: {}\r\n", channel, user, response).as_bytes()).await.unwrap();
+                        writer.flush().await.unwrap();
+                    }
+                }
+            } else {
+                message_buffer.add_message(msg_content);
+            }
+            // other commands here
         }
     }     
 }
@@ -178,3 +187,4 @@ async fn nickme<W: tokio::io::AsyncWriteExt + Unpin>(writer: &mut W, nickname: &
     writer.flush().await?;
     Ok(())
 }
+
