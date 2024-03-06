@@ -160,7 +160,7 @@ async fn writemsg(mut writer: tokio::io::WriteHalf<tokio_native_tls::TlsStream<T
         }
         if *cmd == "PRIVMSG" {
             let channel = parts[2];
-            let user = parts[0].strip_prefix(':').unwrap().split_at(parts[0].find('!').unwrap()).0;
+            let user = parts[0].strip_prefix(':').unwrap().split_at(parts[0].find('!').unwrap()).0.strip_suffix('!').unwrap();
             let host = parts[0].split_at(parts[0].find('!').unwrap()).1;
             let msg_content = parts[3..].join(" ").replace(':', "");
             println!("{} {} {} {} {} {} {}", "DEBUG:".bold().yellow(), "channel:".bold().green(), channel.purple(), "user:".bold().green(), host.purple(), "msg:".bold().green(), msg_content.purple());
