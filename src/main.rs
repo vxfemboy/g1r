@@ -1,4 +1,4 @@
-use tokio::io::{split, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{split, AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tokio_native_tls::native_tls::TlsConnector as NTlsConnector;
 use tokio_native_tls::TlsConnector;
@@ -7,6 +7,7 @@ use serde::Deserialize;
 use std::fs;
 use std::sync::atomic::{AtomicBool, Ordering};
 use colored::*;
+use tokio_socks::tcp::Socks5Stream;
 
 #[derive(Deserialize)]
 struct Config {
@@ -18,6 +19,14 @@ struct Config {
     sasl_username: Option<String>,
     sasl_password: Option<String>,
     capabilities: Option<Vec<String>>,
+    
+    // Proxy
+    use_proxy: bool,
+    proxy_type: Option<String>,
+    proxy_addr: Option<String>,
+    proxy_port: Option<u16>,
+    proxy_username: Option<String>,
+    proxy_password: Option<String>,
 }
 
 mod mods {
@@ -35,20 +44,57 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = loaded_config().expect("Error parsing config.toml");
     println!("Config loaded!");
 
+    let server = format!("{}:{}", config.server, config.port);
+
     if config.use_ssl {
-        let tcp_stream = TcpStream::connect(format!("{}:{}", config.server, config.port)).await;
-        println!("Connected to {}!", format!("{}:{}", config.server, config.port).green());
+        if config.use_proxy {
+            let tcp_stream = proxy_exec(&config).await;
+            match tcp_stream {
+                Ok(tcp_stream) => {
+                    let tls_stream = tls_exec(&config, tcp_stream).await;
+                    match tls_stream {
+                        Ok(tls_stream) => {
+                            if let Err(e) = handler(tls_stream, config).await {
+                                println!("Error handling TLS connection: {}", e);
+                            }
+                        },
+                        Err(e) => {
+                            println!("Error establishing TLS connection: {}", e);
+                        }
+                    }
+                    //handler(tls_stream, config).await.unwrap();
+                },
+                Err(e) => {
+                    println!("Error connecting to proxy: {}", e);
+                }
+            }
+            //let tls_stream = tls_exec(&config, tcp_stream).await
+            //handler(tls_stream, config).await.unwrap();
+        } else {
+            let tcp_stream = TcpStream::connect(server).await.expect("Error connecting to server");
+            let  tls_stream = tls_exec(&config, tcp_stream).await.expect("Error establishing TLS connection");
+            handler(tls_stream, config).await.unwrap();
+        }
+        //let tcp_stream = TcpStream::connect(format!("{}:{}", config.server, config.port)).await;
+        //println!("Connected to {}!", format!("{}:{}", config.server, config.port).green());
+        //println!("Establishing TLS connection...");
+        //if let Ok(tcp_stream) = TcpStream::connect(format!("{}:{}", config.server, config.port)).await {
+        //    println!("TCP connection established!");
+        //    let mut tls_stream = tls_exec(&config, Some(tcp_stream)).await.unwrap();
+        //    println!("TLS connection established!");
+        //    tls_stream.flush().await.unwrap();
+        //} else {
+        //    println!("TCP connection failed!");
+        //};
+        //let mut tls_stream = tls_exec(&config, Some(tcp_stream.unwrap())).await.unwrap();
+        //println!("TLS connection established!");
+        //tls_stream.flush().await.unwrap();
 
-        println!("Establishing TLS connection...");
-        let mut tls_stream = tls_exec (&config, tcp_stream.unwrap()).await.unwrap();
-        println!("TLS connection established!");
-        tls_stream.flush().await.unwrap();
-
-        handler(tls_stream, config).await.unwrap();
+        //handler(tls_stream, config).await.unwrap();
     } else {
         println!("Non-SSL connection not implemented.");
     }
-    }).await.unwrap();
+    }).await.unwrap(); 
     Ok(())
 }
 
@@ -60,12 +106,39 @@ fn loaded_config() -> Result<Config, Box<dyn std::error::Error>> {
 }
 
 /// Establish a TLS connection to the server
-async fn tls_exec(config: &Config, tcp_stream: TcpStream) -> Result<tokio_native_tls::TlsStream<TcpStream>, Box<dyn std::error::Error>> {
-    let tls_builder = NTlsConnector::builder().danger_accept_invalid_certs(true).build()?;
+async fn tls_exec(config: &Config, tcp_stream: TcpStream) -> Result<tokio_native_tls::TlsStream<TcpStream>, Box<dyn std::error::Error + Send>> {
+    let tls_builder = NTlsConnector::builder().danger_accept_invalid_certs(true).build().unwrap();
     let tls_connector = TlsConnector::from(tls_builder);
-    Ok(tls_connector.connect(&config.server, tcp_stream).await?)
+    Ok(tls_connector.connect(&config.server, tcp_stream).await.unwrap())
+
 }
 
+/// Establish a connection to the proxy
+async fn proxy_exec(config: &Config) -> Result<TcpStream, Box<dyn std::error::Error + Send>> {
+    let proxy_addr = match config.proxy_addr.as_ref() {
+        Some(addr) => addr,
+        None => "127.0.0.1",
+    };
+    let proxy_port = config.proxy_port.unwrap_or(9050); 
+    let proxy = format!("{}:{}", proxy_addr, proxy_port);
+    let server = format!("{}:{}", config.server, config.port);
+    let proxy_stream = TcpStream::connect(proxy).await.unwrap();
+    let username = config.proxy_username.clone().unwrap();
+    let password = config.proxy_password.clone().unwrap();
+    let tcp_stream = if !&username.is_empty() && !password.is_empty() {
+        let tcp_stream = Socks5Stream::connect_with_password_and_socket(proxy_stream, server, &username, &password).await.unwrap();
+        tcp_stream
+        
+    } else {
+        let tcp_stream = Socks5Stream::connect_with_socket(proxy_stream, server).await.unwrap();
+        tcp_stream
+    };
+    let tcp_stream = tcp_stream.into_inner();
+
+//    ok(tcp_stream)
+    //Ok(tcp_stream<TcpStream>)
+    Ok(tcp_stream)
+}
 
 /// Handle the connection to the server
 async fn handler(tls_stream: tokio_native_tls::TlsStream<TcpStream>, config: Config) -> Result<(), Box<dyn std::error::Error>> {
