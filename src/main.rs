@@ -62,35 +62,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             println!("Error establishing TLS connection: {}", e);
                         }
                     }
-                    //handler(tls_stream, config).await.unwrap();
                 },
                 Err(e) => {
                     println!("Error connecting to proxy: {}", e);
                 }
             }
-            //let tls_stream = tls_exec(&config, tcp_stream).await
-            //handler(tls_stream, config).await.unwrap();
         } else {
             let tcp_stream = TcpStream::connect(server).await.expect("Error connecting to server");
             let  tls_stream = tls_exec(&config, tcp_stream).await.expect("Error establishing TLS connection");
             handler(tls_stream, config).await.unwrap();
         }
-        //let tcp_stream = TcpStream::connect(format!("{}:{}", config.server, config.port)).await;
-        //println!("Connected to {}!", format!("{}:{}", config.server, config.port).green());
-        //println!("Establishing TLS connection...");
-        //if let Ok(tcp_stream) = TcpStream::connect(format!("{}:{}", config.server, config.port)).await {
-        //    println!("TCP connection established!");
-        //    let mut tls_stream = tls_exec(&config, Some(tcp_stream)).await.unwrap();
-        //    println!("TLS connection established!");
-        //    tls_stream.flush().await.unwrap();
-        //} else {
-        //    println!("TCP connection failed!");
-        //};
-        //let mut tls_stream = tls_exec(&config, Some(tcp_stream.unwrap())).await.unwrap();
-        //println!("TLS connection established!");
-        //tls_stream.flush().await.unwrap();
-
-        //handler(tls_stream, config).await.unwrap();
     } else {
         println!("Non-SSL connection not implemented.");
     }
@@ -135,8 +116,6 @@ async fn proxy_exec(config: &Config) -> Result<TcpStream, Box<dyn std::error::Er
     };
     let tcp_stream = tcp_stream.into_inner();
 
-//    ok(tcp_stream)
-    //Ok(tcp_stream<TcpStream>)
     Ok(tcp_stream)
 }
 
