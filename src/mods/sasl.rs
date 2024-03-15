@@ -5,10 +5,11 @@ pub async fn start_sasl_auth<W: tokio::io::AsyncWriteExt + Unpin>(
     writer: &mut W,
     mechanism: &str,
     nickname: &str,
+    realname: &str,
     capabilities: Option<Vec<String>>) -> Result<(), Box<dyn std::error::Error>> {
     writer.write_all(b"CAP LS 302\r\n").await?;
 
-    nickme(writer, nickname).await?;
+    nickme(writer, nickname, realname).await?;
 
     if let Some(caps) = capabilities {
         if !caps.is_empty() {

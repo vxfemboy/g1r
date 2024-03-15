@@ -1,14 +1,26 @@
-server = "irc.supernets.org"
+#[server]
+server = "198.98.52.138" #"irc.supernets.org"
 port = 6697
 use_ssl = true
+
+#[user]
 nickname = "g1r"
-channel = "#superbowl"
+realname = "git.supernets.org/sad/g1r"
+channels = ["#dev", "#superbowl", "#5000"]
 sasl_username = ""
 sasl_password = ""
 capabilities = ["sasl"]
+
+#[proxy]
 use_proxy = false
 proxy_type = "socks5"
 proxy_addr = "127.0.0.1"
-proxy_port = 9050
-proxy_username = "" 
+proxy_port = 1080
+proxy_username = ""
 proxy_password = ""
+
+#[features]
+kickrejoin = true
+ascii_art = "./ircart/ircart"
+pump_delay = 0 # in milliseconds
+

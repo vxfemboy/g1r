@@ -1,10 +1,11 @@
-use tokio::io::{split, AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt};
+use tokio::io::{split, AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt, BufReader, AsyncBufReadExt};
 use tokio::net::TcpStream;
 use tokio_native_tls::native_tls::TlsConnector as NTlsConnector;
 use tokio_native_tls::TlsConnector;
 use tokio::sync::mpsc;
 use serde::Deserialize;
 use std::fs;
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use colored::*;
 use tokio_socks::tcp::Socks5Stream;
@@ -15,11 +16,12 @@ struct Config {
     port: u16,
     use_ssl: bool,
     nickname: String,
-    channel: String,
+    realname: Option<String>,
+    channels: Vec<String>,
     sasl_username: Option<String>,
     sasl_password: Option<String>,
     capabilities: Option<Vec<String>>,
-    
+
     // Proxy
     use_proxy: bool,
     proxy_type: Option<String>,
@@ -27,15 +29,19 @@ struct Config {
     proxy_port: Option<u16>,
     proxy_username: Option<String>,
     proxy_password: Option<String>,
+
+    ascii_art: Option<String>,
+    pump_delay: u64,
 }
 
 mod mods {
     pub mod sasl;
     pub mod sed;
+    pub mod ascii;
 }
 use mods::sasl::{start_sasl_auth, handle_sasl_messages};
 use mods::sed::{SedCommand, MessageBuffer};
-
+use mods::ascii::handle_ascii_command;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 12)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -106,10 +112,9 @@ async fn proxy_exec(config: &Config) -> Result<TcpStream, Box<dyn std::error::Er
     let proxy_stream = TcpStream::connect(proxy).await.unwrap();
     let username = config.proxy_username.clone().unwrap();
     let password = config.proxy_password.clone().unwrap();
-    let tcp_stream = if !&username.is_empty() && !password.is_empty() {
-        let tcp_stream = Socks5Stream::connect_with_password_and_socket(proxy_stream, server, &username, &password).await.unwrap();
+    let mut tcp_stream = if !&username.is_empty() && !password.is_empty() {
+        let tcp_stream =Socks5Stream::connect_with_password_and_socket(proxy_stream, server, &username, &password).await.unwrap();
         tcp_stream
-        
     } else {
         let tcp_stream = Socks5Stream::connect_with_socket(proxy_stream, server).await.unwrap();
         tcp_stream
@@ -156,8 +161,6 @@ async fn readmsg(mut reader: tokio::io::ReadHalf<tokio_native_tls::TlsStream<Tcp
     }
 }
 
-
-
 static SASL_AUTH: AtomicBool = AtomicBool::new(false);
 
 /// Write messages to the server
@@ -166,14 +169,15 @@ async fn writemsg(mut writer: tokio::io::WriteHalf<tokio_native_tls::TlsStream<T
     let username = config.sasl_username.clone().unwrap();
     let password = config.sasl_password.clone().unwrap();
     let nickname = config.nickname.clone();
+    let realname = config.realname.clone().unwrap_or(nickname.clone());
     if !password.is_empty() && !SASL_AUTH.load(Ordering::Relaxed) {
         let capabilities = config.capabilities.clone();
         println!("Starting SASL auth...");
-        start_sasl_auth(&mut writer, "PLAIN", &nickname, capabilities).await.unwrap();
+        start_sasl_auth(&mut writer, "PLAIN", &nickname, &realname, capabilities).await.unwrap();
         writer.flush().await.unwrap();
         SASL_AUTH.store(true, Ordering::Relaxed);
     } else {
-        nickme(&mut writer, &nickname).await.unwrap();
+        nickme(&mut writer, &nickname, &realname).await.unwrap();
         writer.flush().await.unwrap();
     }
 
@@ -206,36 +210,59 @@ async fn writemsg(mut writer: tokio::io::WriteHalf<tokio_native_tls::TlsStream<T
         }
         
         if *cmd == "376" {
-            println!("Joining channel");
-            writer.write_all(format!("JOIN {}\r\n", config.channel).as_bytes()).await.unwrap();
-            writer.flush().await.unwrap();
+            println!("Joining channels");
+            for channel in &config.channels {
+                writer.write_all(format!("JOIN {}\r\n", channel).as_bytes()).await.unwrap();
+                writer.flush().await.unwrap();
+            }
+        }
+        if *cmd == "KICK" {
+            let channel = parts[2];
+            let userme = parts[3];
+            if userme == nickname {
+                writer.write_all(format!("JOIN {}\r\n", channel).as_bytes()).await.unwrap();
+                writer.flush().await.unwrap();
+            }
         }
         if *cmd == "PRIVMSG" {
             let channel = parts[2];
-            let user = parts[0].strip_prefix(':').unwrap().split_at(parts[0].find('!').unwrap()).0.strip_suffix('!').unwrap();
-            let host = parts[0].split_at(parts[0].find('!').unwrap()).1;
+            let user = parts[0].strip_prefix(':')
+                .and_then(|user_with_host| user_with_host.split('!').next())
+                .unwrap_or("unknown_user");
+            let host = parts[0].split('@').nth(1).unwrap_or("unknown_host");
             let msg_content = parts[3..].join(" ").replace(':', "");
-            println!("{} {} {} {} {} {} {}", "DEBUG:".bold().yellow(), "channel:".bold().green(), channel.purple(), "user:".bold().green(), host.purple(), "msg:".bold().green(), msg_content.purple());
+            println!("{} {} {} {} {} {} {} {} {}", "DEBUG:".bold().yellow(), "channel:".bold().green(), channel.purple(), "user:".bold().green(), user.purple(), "host:".bold().green(), host.purple(), "msg:".bold().green(), msg_content.yellow());
+
             // sed
             if msg_content.starts_with("s/") {
-                println!("Sed command detected");
-                if let Some(sed_command) = SedCommand::parse(&msg_content) {
+                if let Some(sed_command) = SedCommand::parse(&msg_content.clone()) {
                     if let Some(response) = message_buffer.apply_sed_command(&sed_command) {
                         writer.write_all(format!("PRIVMSG {} :{}: {}\r\n", channel, user, response).as_bytes()).await.unwrap();
                         writer.flush().await.unwrap();
                     }
                 }
             } else {
-                message_buffer.add_message(msg_content);
+                message_buffer.add_message(msg_content.clone());
             }
+
+            // ansi art
+            //
+            if msg_content.starts_with("%ascii") {
+                handle_ascii_command(&mut writer, &config, &msg_content, channel).await;
+            }
+
+
             // other commands here
         }
     }     
 }
-async fn nickme<W: tokio::io::AsyncWriteExt + Unpin>(writer: &mut W, nickname: &str) -> Result<(), Box<dyn std::error::Error>> {
+
+
+
+async fn nickme<W: tokio::io::AsyncWriteExt + Unpin>(writer: &mut W, nickname: &str, realname: &str) -> Result<(), Box<dyn std::error::Error>> {
     writer.write_all(format!("NICK {}\r\n", nickname).as_bytes()).await?;
     writer.flush().await?;
-    writer.write_all(format!("USER {} 0 * :{}\r\n", nickname, nickname).as_bytes()).await?;
+    writer.write_all(format!("USER {} 0 * :{}\r\n", nickname, realname).as_bytes()).await?;
     writer.flush().await?;
     Ok(())
 }
