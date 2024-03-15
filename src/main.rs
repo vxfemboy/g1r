@@ -225,12 +225,16 @@ async fn writemsg(mut writer: tokio::io::WriteHalf<tokio_native_tls::TlsStream<T
             }
         }
         if *cmd == "PRIVMSG" {
-            let channel = parts[2];
+            let channel = &parts.get(2).to_owned().unwrap_or(&"");
             let user = parts[0].strip_prefix(':')
                 .and_then(|user_with_host| user_with_host.split('!').next())
                 .unwrap_or("unknown_user");
             let host = parts[0].split('@').nth(1).unwrap_or("unknown_host");
-            let msg_content = parts[3..].join(" ").replace(':', "");
+            let msg_content = if parts.len() > 3 {
+                parts[3..].join(" ").replace(':', "")
+            } else {
+                "".to_string()
+            };
             println!("{} {} {} {} {} {} {} {} {}", "DEBUG:".bold().yellow(), "channel:".bold().green(), channel.purple(), "user:".bold().green(), user.purple(), "host:".bold().green(), host.purple(), "msg:".bold().green(), msg_content.yellow());
 
             // sed
