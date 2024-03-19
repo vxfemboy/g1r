@@ -67,7 +67,7 @@ fn select_random_file(dir: &str) -> Option<String> {
 
 pub async fn handle_ascii_command<W: AsyncWriteExt + Unpin>(
     writer: &mut W,
-    config: &Config, // Adjust the path as necessary to match your project structure
+    config: &Config, 
     command: &str,
     channel: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -143,13 +143,16 @@ async fn handle_specific_file<W: AsyncWriteExt + Unpin>(
     channel: &str,
     parts: &[&str],
 ) -> Result<(), Box<dyn Error>> {
-    let file_name = if parts.len() >= 3 {
-        parts[2..].join(" ")
+    println!("{:?}", parts);
+    let file_name = if parts.len() > 2 {
+        parts[1..].join(" ").replace(' ', "/")
     } else {
-        parts[2].to_string()
+        parts.get(1).unwrap_or(&"").to_string()
     };
+    println!("{:?}", file_name);
 
     let file_path = format!("{}/{}.txt", config.ascii_art.clone().unwrap_or_else(|| "ascii_art".to_string()), file_name);
+    println!("{:?}", file_path);
     
     send_ansi_art(writer, &file_path, config.pump_delay, channel).await
 }
