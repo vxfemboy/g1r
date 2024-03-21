@@ -217,9 +217,9 @@ async fn writemsg(mut writer: tokio::io::WriteHalf<tokio_native_tls::TlsStream<T
             }
         }
         if *cmd == "KICK" {
-            let channel = parts[2];
-            let userme = parts[3];
-            if userme == nickname {
+            let channel = parts.get(2).unwrap_or(&"");
+            let userme = parts.get(3).unwrap_or(&"");
+            if *userme == nickname {
                 writer.write_all(format!("JOIN {}\r\n", channel).as_bytes()).await.unwrap();
                 writer.flush().await.unwrap();
             }
