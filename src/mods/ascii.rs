@@ -77,7 +77,7 @@ pub async fn handle_ascii_command<W: AsyncWriteExt + Unpin>(
     if *command_type == "random" && parts.len() == 2 {
         handle_random(writer, config, channel).await?;
     } else if *command_type == "list"{
-        handle_list(writer, config, channel, Some(parts.get(3).unwrap_or(&""))).await?;
+        handle_list(writer, config, channel, Some(parts.get(2).unwrap_or(&""))).await?;
     } else {
         handle_specific_file(writer, config, channel, &parts).await?;
     }
@@ -104,10 +104,11 @@ async fn handle_list<W: AsyncWriteExt + Unpin>(
     writer: &mut W,
     config: &Config,
     channel: &str,
-    subdirectory: Option<&str>,
+    parts: Option<&str>
 ) -> Result<(), Box<dyn Error>> {
     let base_dir = config.ascii_art.clone().unwrap_or_else(|| "ascii_art".to_string());
-    let dir = if let Some(subdir) = subdirectory {
+
+    let dir = if let Some(subdir) = parts {
         format!("{}/{}", base_dir, subdir)
     } else {
         base_dir
