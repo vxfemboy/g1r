@@ -10,7 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use colored::*;
 use tokio_socks::tcp::Socks5Stream;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 struct Config {
     server: String,
     port: u16,
@@ -21,6 +21,9 @@ struct Config {
     sasl_username: Option<String>,
     sasl_password: Option<String>,
     capabilities: Option<Vec<String>>,
+
+    reconnect_delay: u64,
+    reconnect_attempts: u64,
 
     // Proxy
     use_proxy: bool,
@@ -45,43 +48,62 @@ use mods::ascii::handle_ascii_command;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 12)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tokio::spawn(async move {
+    //tokio::spawn(async move {
     println!("Loading Config...");
     let config = loaded_config().expect("Error parsing config.toml");
     println!("Config loaded!");
+    let mut reconnect_attempts = 0;
 
-    let server = format!("{}:{}", config.server, config.port);
+    while reconnect_attempts < config.reconnect_attempts {
+        let configc = config.clone();
 
-    if config.use_ssl {
-        if config.use_proxy {
-            let tcp_stream = proxy_exec(&config).await;
-            match tcp_stream {
-                Ok(tcp_stream) => {
-                    let tls_stream = tls_exec(&config, tcp_stream).await;
-                    match tls_stream {
-                        Ok(tls_stream) => {
-                            if let Err(e) = handler(tls_stream, config).await {
-                                println!("Error handling TLS connection: {}", e);
+        let server = format!("{}:{}", configc.server, configc.port);
+        let connection_result = tokio::spawn(async move {
+            let config = configc.clone();
+            if config.use_ssl {
+                if config.use_proxy {
+                    let tcp_stream = proxy_exec(&config).await;
+                    match tcp_stream {
+                        Ok(tcp_stream) => {
+                            let tls_stream = tls_exec(&config, tcp_stream).await;
+                            match tls_stream {
+                                Ok(tls_stream) => {
+                                    if let Err(e) = handler(tls_stream, config).await {
+                                     println!("Error handling TLS connection: {}", e);
+                                    }
+                                },
+                                Err(e) => {
+                                    println!("Error establishing TLS connection: {}", e);
+                                }
                             }
                         },
                         Err(e) => {
-                            println!("Error establishing TLS connection: {}", e);
+                            println!("Error connecting to proxy: {}", e);
                         }
                     }
-                },
-                Err(e) => {
-                    println!("Error connecting to proxy: {}", e);
+                } else {
+                    let tcp_stream = TcpStream::connect(server).await.expect("Error connecting to server");
+                    let  tls_stream = tls_exec(&config, tcp_stream).await.expect("Error establishing TLS connection");
+                    handler(tls_stream, config).await.unwrap();
                 }
+            } else {
+                println!("Non-SSL connection not implemented.");
             }
-        } else {
-            let tcp_stream = TcpStream::connect(server).await.expect("Error connecting to server");
-            let  tls_stream = tls_exec(&config, tcp_stream).await.expect("Error establishing TLS connection");
-            handler(tls_stream, config).await.unwrap();
+            Ok::<(), Box<dyn std::error::Error + Send>>(())
+        }).await.unwrap();
+        match connection_result {
+            Ok(_) => {
+                println!("Connection established successfully!");
+                reconnect_attempts = 0;
+            },
+            Err(e) => {
+                println!("Error handling connection: {}", e);
+                reconnect_attempts += 1;
+                tokio::time::sleep(tokio::time::Duration::from_secs(config.reconnect_delay)).await;
+            }
         }
-    } else {
-        println!("Non-SSL connection not implemented.");
     }
-    }).await.unwrap(); 
+    println!("Reconnect attempts exceeded. Exiting...");
     Ok(())
 }
 

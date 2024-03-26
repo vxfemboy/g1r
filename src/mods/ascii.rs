@@ -27,7 +27,6 @@ async fn send_ansi_art<W: AsyncWriteExt + Unpin>(writer: &mut W, file_path: &str
     let reader = BufReader::new(file);
     let mut lines = reader.lines();
 
-
     while let Some(line) = lines.next_line().await? {
 
         if line.len() > CHUNK_SIZE {
