@@ -6,6 +6,8 @@ use tokio::sync::mpsc;
 use serde::Deserialize;
 use std::fs;
 
+use rand::{thread_rng, Rng};
+
 use std::sync::atomic::{AtomicBool, Ordering};
 use colored::*;
 use tokio_socks::tcp::Socks5Stream;
@@ -41,10 +43,13 @@ mod mods {
     pub mod sasl;
     pub mod sed;
     pub mod ascii;
+    pub mod vomit;
 }
 use mods::sasl::{start_sasl_auth, handle_sasl_messages};
 use mods::sed::{SedCommand, MessageBuffer};
 use mods::ascii::handle_ascii_command;
+use mods::vomit::{handle_vomit_command};
+
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 12)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -253,7 +258,13 @@ async fn writemsg(mut writer: tokio::io::WriteHalf<tokio_native_tls::TlsStream<T
                 .unwrap_or("unknown_user");
             let host = parts[0].split('@').nth(1).unwrap_or("unknown_host");
             let msg_content = if parts.len() > 3 {
-                parts[3..].join(" ").replace(':', "")
+                let remainder = &parts[3..].join(" ");
+                if let Some(pos) = remainder.find(':') {
+                    let (first_part, last_part) = remainder.split_at(pos);
+                    format!("{}{}", first_part, &last_part[1..])
+                } else {
+                    remainder.to_string()
+                }
             } else {
                 "".to_string()
             };
@@ -263,21 +274,24 @@ async fn writemsg(mut writer: tokio::io::WriteHalf<tokio_native_tls::TlsStream<T
             if msg_content.starts_with("s/") {
                 if let Some(sed_command) = SedCommand::parse(&msg_content.clone()) {
                     if let Some(response) = message_buffer.apply_sed_command(&sed_command) {
-                        writer.write_all(format!("PRIVMSG {} :{}: {}\r\n", channel, user, response).as_bytes()).await.unwrap();
+                        writer.write_all(format!("PRIVMSG {} :{}\r\n", channel, response).as_bytes()).await.unwrap();
                         writer.flush().await.unwrap();
                     }
                 }
             } else {
-                message_buffer.add_message(msg_content.clone());
+                message_buffer.add_message(msg_content.clone().to_string());
             }
 
             // ansi art
             //
             if msg_content.starts_with("%ascii") {
-                handle_ascii_command(&mut writer, &config, &msg_content, channel).await;
+                let _ = handle_ascii_command(&mut writer, config, &msg_content, channel).await;
             }
 
 
+            if msg_content.starts_with("%vomit") {
+                let _ = handle_vomit_command(&mut writer, config, &msg_content, channel).await;
+            }
             // other commands here
         }
     }     
@@ -292,4 +306,7 @@ async fn nickme<W: tokio::io::AsyncWriteExt + Unpin>(writer: &mut W, nickname: &
     writer.flush().await?;
     Ok(())
 }
+
+
+
 
