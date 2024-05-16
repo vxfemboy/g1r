@@ -6,8 +6,6 @@ use tokio::sync::mpsc;
 use serde::Deserialize;
 use std::fs;
 
-use rand::{thread_rng, Rng};
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use colored::*;
 use tokio_socks::tcp::Socks5Stream;
@@ -29,7 +27,7 @@ struct Config {
 
     // Proxy
     use_proxy: bool,
-    proxy_type: Option<String>,
+    // proxy_type: Option<String>,
     proxy_addr: Option<String>,
     proxy_port: Option<u16>,
     proxy_username: Option<String>,
@@ -40,16 +38,23 @@ struct Config {
 }
 
 mod mods {
+    pub mod proxy;
+    pub mod tls;
+    pub mod handler;
     pub mod sasl;
     pub mod sed;
     pub mod ascii;
     pub mod vomit;
+//    pub mod invade;
 }
+use mods::proxy::proxy_exec;
+use mods::tls::tls_exec;
+use mods::handler::handler;
 use mods::sasl::{start_sasl_auth, handle_sasl_messages};
 use mods::sed::{SedCommand, MessageBuffer};
 use mods::ascii::handle_ascii_command;
-use mods::vomit::{handle_vomit_command};
-
+use mods::vomit::handle_vomit_command;
+//use mods::invade::{handle_invade_command};
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 12)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -119,58 +124,6 @@ fn loaded_config() -> Result<Config, Box<dyn std::error::Error>> {
     let config_contents = fs::read_to_string("config.toml")?;
     let config: Config = toml::from_str(&config_contents)?;
     Ok(config)
-}
-
-/// Establish a TLS connection to the server
-async fn tls_exec(config: &Config, tcp_stream: TcpStream) -> Result<tokio_native_tls::TlsStream<TcpStream>, Box<dyn std::error::Error + Send>> {
-    let tls_builder = NTlsConnector::builder().danger_accept_invalid_certs(true).build().unwrap();
-    let tls_connector = TlsConnector::from(tls_builder);
-    Ok(tls_connector.connect(&config.server, tcp_stream).await.unwrap())
-
-}
-
-/// Establish a connection to the proxy
-async fn proxy_exec(config: &Config) -> Result<TcpStream, Box<dyn std::error::Error + Send>> {
-    let proxy_addr = match config.proxy_addr.as_ref() {
-        Some(addr) => addr,
-        None => "127.0.0.1",
-    };
-    let proxy_port = config.proxy_port.unwrap_or(9050); 
-    let proxy = format!("{}:{}", proxy_addr, proxy_port);
-    let server = format!("{}:{}", config.server, config.port);
-    let proxy_stream = TcpStream::connect(proxy).await.unwrap();
-    let username = config.proxy_username.clone().unwrap();
-    let password = config.proxy_password.clone().unwrap();
-    let tcp_stream = if !&username.is_empty() && !password.is_empty() {
-        let tcp_stream = Socks5Stream::connect_with_password_and_socket(proxy_stream, server, &username, &password).await.unwrap();
-        tcp_stream
-    } else {
-        let tcp_stream = Socks5Stream::connect_with_socket(proxy_stream, server).await.unwrap();
-        tcp_stream
-    };
-    let tcp_stream = tcp_stream.into_inner();
-
-    Ok(tcp_stream)
-}
-
-/// Handle the connection to the server
-async fn handler<S>(stream: S, config: Config) -> Result<(), Box<dyn std::error::Error>> where S: AsyncRead + AsyncWrite + Unpin + Send + 'static {
-    let (reader, writer) = split(stream);
-    let (tx, rx) = mpsc::channel(1000);
-    
-    let read_task = tokio::spawn(async move {
-        readmsg(reader, tx).await;
-    });
-
-    let message_buffer = MessageBuffer::new(1000);
-
-    let write_task = tokio::spawn(async move {
-        writemsg(writer, rx, &config, message_buffer).await; 
-    });
-
-    //let _ = tokio::try_join!(read_task, write_task);
-    tokio::try_join!(read_task, write_task).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
-    Ok(())
 }
 
 /// Read messages from the server
@@ -288,10 +241,15 @@ async fn writemsg<S>(mut writer: tokio::io::WriteHalf<S>, mut rx: tokio::sync::m
                 let _ = handle_ascii_command(&mut writer, config, &msg_content, channel).await;
             }
 
-
+            // vomit
             if msg_content.starts_with("%vomit") {
                 let _ = handle_vomit_command(&mut writer, config, &msg_content, channel).await;
             }
+
+            // invade 
+//            if msg_content.starts_with("%invade") {
+//                let _ = handle_vomit_command(&mut writer, config, &msg_content, channel).await;
+//            }
             // other commands here
         }
     }     
