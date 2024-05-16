@@ -53,7 +53,6 @@ use mods::vomit::{handle_vomit_command};
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 12)]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    //tokio::spawn(async move {
     println!("Loading Config...");
     let config = loaded_config().expect("Error parsing config.toml");
     println!("Config loaded!");
@@ -65,37 +64,40 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let server = format!("{}:{}", configc.server, configc.port);
         let connection_result = tokio::spawn(async move {
             let config = configc.clone();
-            if config.use_ssl {
-                if config.use_proxy {
-                    let tcp_stream = proxy_exec(&config).await;
-                    match tcp_stream {
-                        Ok(tcp_stream) => {
-                            let tls_stream = tls_exec(&config, tcp_stream).await;
-                            match tls_stream {
-                                Ok(tls_stream) => {
-                                    if let Err(e) = handler(tls_stream, config).await {
-                                     println!("Error handling TLS connection: {}", e);
-                                    }
-                                },
-                                Err(e) => {
-                                    println!("Error establishing TLS connection: {}", e);
-                                }
-                            }
-                        },
-                        Err(e) => {
-                            println!("Error connecting to proxy: {}", e);
-                        }
+            let tcp_stream = if config.use_proxy {
+                match proxy_exec(&config).await {
+                    Ok(stream) => stream,
+                    Err(e) => {
+                        println!("Error connecting to proxy: {}", e);
+                        return Ok::<(), Box<dyn std::error::Error + Send>>(());
                     }
-                } else {
-                    let tcp_stream = TcpStream::connect(server).await.expect("Error connecting to server");
-                    let  tls_stream = tls_exec(&config, tcp_stream).await.expect("Error establishing TLS connection");
-                    handler(tls_stream, config).await.unwrap();
                 }
             } else {
-                println!("Non-SSL connection not implemented.");
+                match TcpStream::connect(server).await {
+                    Ok(stream) => stream,
+                    Err(e) => {
+                        println!("Error connecting to server: {}", e);
+                        return Ok::<(), Box<dyn std::error::Error + Send>>(());
+                    }
+                }
+            };
+
+            if config.use_ssl {
+                println!("Connecting to SSL server...");
+                match tls_exec(&config, tcp_stream).await {
+                    Ok(tls_stream) => handler(tls_stream, config).await.unwrap(),
+                    Err(e) => {
+                        println!("Error establishing TLS connection: {}", e);
+                        return Ok::<(), Box<dyn std::error::Error + Send>>(());
+                    }
+                }
+            } else {
+                println!("Connecting to Non-SSL server...");
+                handler(tcp_stream, config).await.unwrap();
             }
             Ok::<(), Box<dyn std::error::Error + Send>>(())
         }).await.unwrap();
+
         match connection_result {
             Ok(_) => {
                 println!("Connection established successfully!");
@@ -139,8 +141,8 @@ async fn proxy_exec(config: &Config) -> Result<TcpStream, Box<dyn std::error::Er
     let proxy_stream = TcpStream::connect(proxy).await.unwrap();
     let username = config.proxy_username.clone().unwrap();
     let password = config.proxy_password.clone().unwrap();
-    let mut tcp_stream = if !&username.is_empty() && !password.is_empty() {
-        let tcp_stream =Socks5Stream::connect_with_password_and_socket(proxy_stream, server, &username, &password).await.unwrap();
+    let tcp_stream = if !&username.is_empty() && !password.is_empty() {
+        let tcp_stream = Socks5Stream::connect_with_password_and_socket(proxy_stream, server, &username, &password).await.unwrap();
         tcp_stream
     } else {
         let tcp_stream = Socks5Stream::connect_with_socket(proxy_stream, server).await.unwrap();
@@ -152,8 +154,8 @@ async fn proxy_exec(config: &Config) -> Result<TcpStream, Box<dyn std::error::Er
 }
 
 /// Handle the connection to the server
-async fn handler(tls_stream: tokio_native_tls::TlsStream<TcpStream>, config: Config) -> Result<(), Box<dyn std::error::Error>> {
-    let (reader, writer) = split(tls_stream);
+async fn handler<S>(stream: S, config: Config) -> Result<(), Box<dyn std::error::Error>> where S: AsyncRead + AsyncWrite + Unpin + Send + 'static {
+    let (reader, writer) = split(stream);
     let (tx, rx) = mpsc::channel(1000);
     
     let read_task = tokio::spawn(async move {
@@ -166,13 +168,13 @@ async fn handler(tls_stream: tokio_native_tls::TlsStream<TcpStream>, config: Con
         writemsg(writer, rx, &config, message_buffer).await; 
     });
 
-    let _ = tokio::try_join!(read_task, write_task);
-    
+    //let _ = tokio::try_join!(read_task, write_task);
+    tokio::try_join!(read_task, write_task).map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
     Ok(())
 }
 
 /// Read messages from the server
-async fn readmsg(mut reader: tokio::io::ReadHalf<tokio_native_tls::TlsStream<TcpStream>>, tx: tokio::sync::mpsc::Sender<String>) {
+async fn readmsg<S>(mut reader: tokio::io::ReadHalf<S>, tx: tokio::sync::mpsc::Sender<String>) where S: AsyncRead + Unpin {
     let mut buf = vec![0; 4096];
     while let Ok (n) = reader.read(&mut buf).await {
         if n == 0 { break; }
@@ -191,8 +193,7 @@ async fn readmsg(mut reader: tokio::io::ReadHalf<tokio_native_tls::TlsStream<Tcp
 static SASL_AUTH: AtomicBool = AtomicBool::new(false);
 
 /// Write messages to the server
-async fn writemsg(mut writer: tokio::io::WriteHalf<tokio_native_tls::TlsStream<TcpStream>>, mut rx: tokio::sync::mpsc::Receiver<String>, config: &Config, mut message_buffer: MessageBuffer) {
-
+async fn writemsg<S>(mut writer: tokio::io::WriteHalf<S>, mut rx: tokio::sync::mpsc::Receiver<String>, config: &Config, mut message_buffer: MessageBuffer) where S: AsyncWrite + Unpin {
     let username = config.sasl_username.clone().unwrap();
     let password = config.sasl_password.clone().unwrap();
     let nickname = config.nickname.clone();
@@ -283,7 +284,6 @@ async fn writemsg(mut writer: tokio::io::WriteHalf<tokio_native_tls::TlsStream<T
             }
 
             // ansi art
-            //
             if msg_content.starts_with("%ascii") {
                 let _ = handle_ascii_command(&mut writer, config, &msg_content, channel).await;
             }
