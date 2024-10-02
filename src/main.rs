@@ -5,7 +5,6 @@ use tokio_native_tls::TlsConnector;
 use tokio::sync::mpsc;
 use serde::Deserialize;
 use std::fs;
-
 use std::sync::atomic::{AtomicBool, Ordering};
 use colored::*;
 use tokio_socks::tcp::Socks5Stream;
@@ -21,18 +20,13 @@ struct Config {
     sasl_username: Option<String>,
     sasl_password: Option<String>,
     capabilities: Option<Vec<String>>,
-
     reconnect_delay: u64,
     reconnect_attempts: u64,
-
-    // Proxy
     use_proxy: bool,
-    // proxy_type: Option<String>,
     proxy_addr: Option<String>,
     proxy_port: Option<u16>,
     proxy_username: Option<String>,
     proxy_password: Option<String>,
-
     ascii_art: Option<String>,
     pump_delay: u64,
 }
@@ -45,8 +39,10 @@ mod mods {
     pub mod sed;
     pub mod ascii;
     pub mod vomit;
+    pub mod drugs;
 //    pub mod invade;
 }
+
 use mods::proxy::proxy_exec;
 use mods::tls::tls_exec;
 use mods::handler::handler;
@@ -54,6 +50,7 @@ use mods::sasl::{start_sasl_auth, handle_sasl_messages};
 use mods::sed::{SedCommand, MessageBuffer};
 use mods::ascii::handle_ascii_command;
 use mods::vomit::handle_vomit_command;
+use mods::drugs::Drugs;
 //use mods::invade::{handle_invade_command};
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 12)]
@@ -119,17 +116,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Load the config file
 fn loaded_config() -> Result<Config, Box<dyn std::error::Error>> {
     let config_contents = fs::read_to_string("config.toml")?;
     let config: Config = toml::from_str(&config_contents)?;
     Ok(config)
 }
 
-/// Read messages from the server
 async fn readmsg<S>(mut reader: tokio::io::ReadHalf<S>, tx: tokio::sync::mpsc::Sender<String>) where S: AsyncRead + Unpin {
     let mut buf = vec![0; 4096];
-    while let Ok (n) = reader.read(&mut buf).await {
+    while let Ok(n) = reader.read(&mut buf).await {
         if n == 0 { break; }
         let msg_list = String::from_utf8_lossy(&buf[..n]).to_string();
         for lines in msg_list.lines() {
@@ -145,7 +140,6 @@ async fn readmsg<S>(mut reader: tokio::io::ReadHalf<S>, tx: tokio::sync::mpsc::S
 
 static SASL_AUTH: AtomicBool = AtomicBool::new(false);
 
-/// Write messages to the server
 async fn writemsg<S>(mut writer: tokio::io::WriteHalf<S>, mut rx: tokio::sync::mpsc::Receiver<String>, config: &Config, mut message_buffer: MessageBuffer) where S: AsyncWrite + Unpin {
     let username = config.sasl_username.clone().unwrap();
     let password = config.sasl_password.clone().unwrap();
@@ -161,6 +155,8 @@ async fn writemsg<S>(mut writer: tokio::io::WriteHalf<S>, mut rx: tokio::sync::m
         nickme(&mut writer, &nickname, &realname).await.unwrap();
         writer.flush().await.unwrap();
     }
+
+    let mut drugs = Drugs::new();
 
     while let Some(msg) = rx.recv().await {
         let msg = msg.trim();
@@ -224,7 +220,6 @@ async fn writemsg<S>(mut writer: tokio::io::WriteHalf<S>, mut rx: tokio::sync::m
             };
             println!("{} {} {} {} {} {} {} {} {}", "DEBUG:".bold().yellow(), "channel:".bold().green(), channel.purple(), "user:".bold().green(), user.purple(), "host:".bold().green(), host.purple(), "msg:".bold().green(), msg_content.yellow());
 
-            // sed
             if msg_content.starts_with("s/") {
                 if let Some(sed_command) = SedCommand::parse(&msg_content.clone()) {
                     if let Some(response) = message_buffer.apply_sed_command(&sed_command) {
@@ -236,26 +231,22 @@ async fn writemsg<S>(mut writer: tokio::io::WriteHalf<S>, mut rx: tokio::sync::m
                 message_buffer.add_message(msg_content.clone().to_string());
             }
 
-            // ansi art
             if msg_content.starts_with("%ascii") {
                 let _ = handle_ascii_command(&mut writer, config, &msg_content, channel).await;
             }
 
-            // vomit
             if msg_content.starts_with("%vomit") {
                 let _ = handle_vomit_command(&mut writer, config, &msg_content, channel).await;
             }
 
-            // invade 
-//            if msg_content.starts_with("%invade") {
-//                let _ = handle_vomit_command(&mut writer, config, &msg_content, channel).await;
-//            }
-            // other commands here
+            if ["%chug", "%smoke", "%toke", "%100", "%extendo", "%fatfuck", "%beer"].iter().any(|&prefix| msg_content.starts_with(prefix)) {
+                drugs.handle_drugs_command(&mut writer, config, &msg_content, channel).await
+                    .unwrap_or_else(|e| eprintln!("Error handling drugs command: {}", e));
+            }
+
         }
     }     
 }
-
-
 
 async fn nickme<W: tokio::io::AsyncWriteExt + Unpin>(writer: &mut W, nickname: &str, realname: &str) -> Result<(), Box<dyn std::error::Error>> {
     writer.write_all(format!("NICK {}\r\n", nickname).as_bytes()).await?;
@@ -264,7 +255,4 @@ async fn nickme<W: tokio::io::AsyncWriteExt + Unpin>(writer: &mut W, nickname: &
     writer.flush().await?;
     Ok(())
 }
-
-
-
 
