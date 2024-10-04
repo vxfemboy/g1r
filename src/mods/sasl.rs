@@ -6,7 +6,8 @@ pub async fn start_sasl_auth<W: tokio::io::AsyncWriteExt + Unpin>(
     mechanism: &str,
     nickname: &str,
     realname: &str,
-    capabilities: Option<Vec<String>>) -> Result<(), Box<dyn std::error::Error>> {
+    capabilities: Option<Vec<String>>,
+) -> Result<(), Box<dyn std::error::Error>> {
     writer.write_all(b"CAP LS 302\r\n").await?;
 
     nickme(writer, nickname, realname).await?;
@@ -36,7 +37,9 @@ pub async fn handle_sasl_messages<W: tokio::io::AsyncWriteExt + Unpin>(
     } else if message.starts_with("AUTHENTICATE +") {
         let auth_string = format!("\0{}\0{}", username, password);
         let encoded = base64::engine::general_purpose::STANDARD.encode(auth_string);
-        writer.write_all(format!("AUTHENTICATE {}\r\n", encoded).as_bytes()).await?;
+        writer
+            .write_all(format!("AUTHENTICATE {}\r\n", encoded).as_bytes())
+            .await?;
     } else if message.contains("903 * :SASL authentication successful") {
         writer.write_all(b"CAP END\r\n").await?;
     }

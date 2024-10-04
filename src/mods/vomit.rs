@@ -1,8 +1,8 @@
-
+// mods/vomit.rs
+use crate::Config;
 use rand::prelude::*;
 use tokio::io::AsyncWriteExt;
 use tokio::time;
-use crate::Config;
 
 async fn generate_random_unicode() -> char {
     let codepoint: u32 = thread_rng().gen_range(0..=0x10FFFF);
@@ -39,7 +39,7 @@ fn split_into_chunks(s: &str, max_chunk_size: usize) -> Vec<String> {
 
     for char in s.chars() {
         if current_chunk.len() + char.len_utf8() > max_chunk_size {
-            chunks.push(current_chunk.clone()); 
+            chunks.push(current_chunk.clone());
             current_chunk.clear();
         }
         current_chunk.push(char);
@@ -51,7 +51,6 @@ fn split_into_chunks(s: &str, max_chunk_size: usize) -> Vec<String> {
 
     chunks
 }
-
 
 const CHUNK_SIZE: usize = 400;
 // Function to handle the vomit command
@@ -68,7 +67,9 @@ pub async fn handle_vomit_command<W: AsyncWriteExt + Unpin>(
     let chunks = split_into_chunks(&vomit, CHUNK_SIZE); // Adjust if split_into_chunks is async
 
     for chunk in chunks {
-        writer.write_all(format!("PRIVMSG {} :{}\r\n", channel, chunk).as_bytes()).await?;
+        writer
+            .write_all(format!("PRIVMSG {} :{}\r\n", channel, chunk).as_bytes())
+            .await?;
         writer.flush().await?;
         time::sleep(tokio::time::Duration::from_secs(config.pump_delay)).await;
     }

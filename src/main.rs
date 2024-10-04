@@ -1,12 +1,14 @@
-use tokio::io::{split, AsyncRead, AsyncWrite, AsyncReadExt, AsyncWriteExt, BufReader, AsyncBufReadExt};
-use tokio::net::TcpStream;
-use tokio_native_tls::native_tls::TlsConnector as NTlsConnector;
-use tokio_native_tls::TlsConnector;
-use tokio::sync::mpsc;
+use colored::*;
 use serde::Deserialize;
 use std::fs;
 use std::sync::atomic::{AtomicBool, Ordering};
-use colored::*;
+use tokio::io::{
+    split, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader,
+};
+use tokio::net::TcpStream;
+use tokio::sync::mpsc;
+use tokio_native_tls::native_tls::TlsConnector as NTlsConnector;
+use tokio_native_tls::TlsConnector;
 use tokio_socks::tcp::Socks5Stream;
 
 #[derive(Deserialize, Clone)]
@@ -32,25 +34,25 @@ struct Config {
 }
 
 mod mods {
-    pub mod proxy;
-    pub mod tls;
+    pub mod ascii;
+    pub mod drugs;
     pub mod handler;
+    pub mod proxy;
     pub mod sasl;
     pub mod sed;
-    pub mod ascii;
+    pub mod tls;
     pub mod vomit;
-    pub mod drugs;
-//    pub mod invade;
+    //    pub mod invade;
 }
 
-use mods::proxy::proxy_exec;
-use mods::tls::tls_exec;
-use mods::handler::handler;
-use mods::sasl::{start_sasl_auth, handle_sasl_messages};
-use mods::sed::{SedCommand, MessageBuffer};
 use mods::ascii::handle_ascii_command;
-use mods::vomit::handle_vomit_command;
 use mods::drugs::Drugs;
+use mods::handler::handler;
+use mods::proxy::proxy_exec;
+use mods::sasl::{handle_sasl_messages, start_sasl_auth};
+use mods::sed::{MessageBuffer, SedCommand};
+use mods::tls::tls_exec;
+use mods::vomit::handle_vomit_command;
 //use mods::invade::{handle_invade_command};
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 12)]
@@ -98,13 +100,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 handler(tcp_stream, config).await.unwrap();
             }
             Ok::<(), Box<dyn std::error::Error + Send>>(())
-        }).await.unwrap();
+        })
+        .await
+        .unwrap();
 
         match connection_result {
             Ok(_) => {
                 println!("Connection established successfully!");
                 reconnect_attempts = 0;
-            },
+            }
             Err(e) => {
                 println!("Error handling connection: {}", e);
                 reconnect_attempts += 1;
@@ -122,14 +126,27 @@ fn loaded_config() -> Result<Config, Box<dyn std::error::Error>> {
     Ok(config)
 }
 
-async fn readmsg<S>(mut reader: tokio::io::ReadHalf<S>, tx: tokio::sync::mpsc::Sender<String>) where S: AsyncRead + Unpin {
+async fn readmsg<S>(mut reader: tokio::io::ReadHalf<S>, tx: tokio::sync::mpsc::Sender<String>)
+where
+    S: AsyncRead + Unpin,
+{
     let mut buf = vec![0; 4096];
     while let Ok(n) = reader.read(&mut buf).await {
-        if n == 0 { break; }
+        if n == 0 {
+            break;
+        }
         let msg_list = String::from_utf8_lossy(&buf[..n]).to_string();
         for lines in msg_list.lines() {
             let msg = lines.to_string();
-            println!("{}{}{} {}{} {}", "[".green().bold(), ">".yellow().bold(), "]".green().bold(), "DEBUG:".bold().yellow(), ":".bold().green(), msg.trim().purple());
+            println!(
+                "{}{}{} {}{} {}",
+                "[".green().bold(),
+                ">".yellow().bold(),
+                "]".green().bold(),
+                "DEBUG:".bold().yellow(),
+                ":".bold().green(),
+                msg.trim().purple()
+            );
             tx.send(msg).await.unwrap();
             if buf.len() == n {
                 buf.resize(buf.len() * 2, 0);
@@ -140,7 +157,14 @@ async fn readmsg<S>(mut reader: tokio::io::ReadHalf<S>, tx: tokio::sync::mpsc::S
 
 static SASL_AUTH: AtomicBool = AtomicBool::new(false);
 
-async fn writemsg<S>(mut writer: tokio::io::WriteHalf<S>, mut rx: tokio::sync::mpsc::Receiver<String>, config: &Config, mut message_buffer: MessageBuffer) where S: AsyncWrite + Unpin {
+async fn writemsg<S>(
+    mut writer: tokio::io::WriteHalf<S>,
+    mut rx: tokio::sync::mpsc::Receiver<String>,
+    config: &Config,
+    mut message_buffer: MessageBuffer,
+) where
+    S: AsyncWrite + Unpin,
+{
     let username = config.sasl_username.clone().unwrap();
     let password = config.sasl_password.clone().unwrap();
     let nickname = config.nickname.clone();
@@ -148,7 +172,9 @@ async fn writemsg<S>(mut writer: tokio::io::WriteHalf<S>, mut rx: tokio::sync::m
     if !password.is_empty() && !SASL_AUTH.load(Ordering::Relaxed) {
         let capabilities = config.capabilities.clone();
         println!("Starting SASL auth...");
-        start_sasl_auth(&mut writer, "PLAIN", &nickname, &realname, capabilities).await.unwrap();
+        start_sasl_auth(&mut writer, "PLAIN", &nickname, &realname, capabilities)
+            .await
+            .unwrap();
         writer.flush().await.unwrap();
         SASL_AUTH.store(true, Ordering::Relaxed);
     } else {
@@ -167,29 +193,51 @@ async fn writemsg<S>(mut writer: tokio::io::WriteHalf<S>, mut rx: tokio::sync::m
         let serv = parts.first().unwrap_or(&"");
         let cmd = parts.get(1).unwrap_or(&"");
 
-        println!("{} {} {} {} {}", "DEBUG:".bold().yellow(), "serv:".bold().green(), serv.purple(), "cmd:".bold().green(), cmd.purple());
-        if *serv == "PING" { 
+        println!(
+            "{} {} {} {} {}",
+            "DEBUG:".bold().yellow(),
+            "serv:".bold().green(),
+            serv.purple(),
+            "cmd:".bold().green(),
+            cmd.purple()
+        );
+        if *serv == "PING" {
             let response = msg.replace("PING", "PONG") + "\r\n";
-            println!("{} {} {}","[%] PONG:".bold().green(), nickname.blue(), response.purple());
+            println!(
+                "{} {} {}",
+                "[%] PONG:".bold().green(),
+                nickname.blue(),
+                response.purple()
+            );
             writer.write_all(response.as_bytes()).await.unwrap();
             writer.flush().await.unwrap();
             continue;
         }
-        if (*cmd == "CAP" || msg.starts_with("AUTHENTICATE +") || *cmd == "903") && SASL_AUTH.load(Ordering::Relaxed) {
+        if (*cmd == "CAP" || msg.starts_with("AUTHENTICATE +") || *cmd == "903")
+            && SASL_AUTH.load(Ordering::Relaxed)
+        {
             println!("Handling SASL messages...");
-            handle_sasl_messages(&mut writer, msg.trim(), &username, &password, &nickname).await.unwrap();
+            handle_sasl_messages(&mut writer, msg.trim(), &username, &password, &nickname)
+                .await
+                .unwrap();
             writer.flush().await.unwrap();
         }
         if *cmd == "001" {
             println!("Setting mode");
-            writer.write_all(format!("MODE {} +B\r\n", nickname).as_bytes()).await.unwrap();
+            writer
+                .write_all(format!("MODE {} +B\r\n", nickname).as_bytes())
+                .await
+                .unwrap();
             writer.flush().await.unwrap();
         }
-        
+
         if *cmd == "376" {
             println!("Joining channels");
             for channel in &config.channels {
-                writer.write_all(format!("JOIN {}\r\n", channel).as_bytes()).await.unwrap();
+                writer
+                    .write_all(format!("JOIN {}\r\n", channel).as_bytes())
+                    .await
+                    .unwrap();
                 writer.flush().await.unwrap();
             }
         }
@@ -197,13 +245,17 @@ async fn writemsg<S>(mut writer: tokio::io::WriteHalf<S>, mut rx: tokio::sync::m
             let channel = parts.get(2).unwrap_or(&"");
             let userme = parts.get(3).unwrap_or(&"");
             if *userme == nickname {
-                writer.write_all(format!("JOIN {}\r\n", channel).as_bytes()).await.unwrap();
+                writer
+                    .write_all(format!("JOIN {}\r\n", channel).as_bytes())
+                    .await
+                    .unwrap();
                 writer.flush().await.unwrap();
             }
         }
         if *cmd == "PRIVMSG" {
             let channel = &parts.get(2).to_owned().unwrap_or(&"");
-            let user = parts[0].strip_prefix(':')
+            let user = parts[0]
+                .strip_prefix(':')
                 .and_then(|user_with_host| user_with_host.split('!').next())
                 .unwrap_or("unknown_user");
             let host = parts[0].split('@').nth(1).unwrap_or("unknown_host");
@@ -218,12 +270,26 @@ async fn writemsg<S>(mut writer: tokio::io::WriteHalf<S>, mut rx: tokio::sync::m
             } else {
                 "".to_string()
             };
-            println!("{} {} {} {} {} {} {} {} {}", "DEBUG:".bold().yellow(), "channel:".bold().green(), channel.purple(), "user:".bold().green(), user.purple(), "host:".bold().green(), host.purple(), "msg:".bold().green(), msg_content.yellow());
+            println!(
+                "{} {} {} {} {} {} {} {} {}",
+                "DEBUG:".bold().yellow(),
+                "channel:".bold().green(),
+                channel.purple(),
+                "user:".bold().green(),
+                user.purple(),
+                "host:".bold().green(),
+                host.purple(),
+                "msg:".bold().green(),
+                msg_content.yellow()
+            );
 
             if msg_content.starts_with("s/") {
                 if let Some(sed_command) = SedCommand::parse(&msg_content.clone()) {
                     if let Some(response) = message_buffer.apply_sed_command(&sed_command) {
-                        writer.write_all(format!("PRIVMSG {} :{}\r\n", channel, response).as_bytes()).await.unwrap();
+                        writer
+                            .write_all(format!("PRIVMSG {} :{}\r\n", channel, response).as_bytes())
+                            .await
+                            .unwrap();
                         writer.flush().await.unwrap();
                     }
                 }
@@ -239,20 +305,33 @@ async fn writemsg<S>(mut writer: tokio::io::WriteHalf<S>, mut rx: tokio::sync::m
                 let _ = handle_vomit_command(&mut writer, config, &msg_content, channel).await;
             }
 
-            if ["%chug", "%smoke", "%toke", "%100", "%extendo", "%fatfuck", "%beer"].iter().any(|&prefix| msg_content.starts_with(prefix)) {
-                drugs.handle_drugs_command(&mut writer, config, &msg_content, channel).await
+            if [
+                "%chug", "%smoke", "%toke", "%100", "%extendo", "%fatfuck", "%beer",
+            ]
+            .iter()
+            .any(|&prefix| msg_content.starts_with(prefix))
+            {
+                drugs
+                    .handle_drugs_command(&mut writer, config, &msg_content, channel)
+                    .await
                     .unwrap_or_else(|e| eprintln!("Error handling drugs command: {}", e));
             }
-
         }
-    }     
+    }
 }
 
-async fn nickme<W: tokio::io::AsyncWriteExt + Unpin>(writer: &mut W, nickname: &str, realname: &str) -> Result<(), Box<dyn std::error::Error>> {
-    writer.write_all(format!("NICK {}\r\n", nickname).as_bytes()).await?;
+async fn nickme<W: tokio::io::AsyncWriteExt + Unpin>(
+    writer: &mut W,
+    nickname: &str,
+    realname: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    writer
+        .write_all(format!("NICK {}\r\n", nickname).as_bytes())
+        .await?;
     writer.flush().await?;
-    writer.write_all(format!("USER {} 0 * :{}\r\n", nickname, realname).as_bytes()).await?;
+    writer
+        .write_all(format!("USER {} 0 * :{}\r\n", nickname, realname).as_bytes())
+        .await?;
     writer.flush().await?;
     Ok(())
 }
-

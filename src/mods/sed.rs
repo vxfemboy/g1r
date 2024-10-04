@@ -1,3 +1,4 @@
+// mods/sed.rs
 use regex::Regex;
 use std::collections::VecDeque;
 
@@ -30,9 +31,13 @@ impl SedCommand {
 
     pub fn apply_to(&self, message: &str) -> String {
         if self.global {
-            self.pattern.replace_all(message, self.replacement.as_str()).to_string()
+            self.pattern
+                .replace_all(message, self.replacement.as_str())
+                .to_string()
         } else {
-            self.pattern.replace(message, self.replacement.as_str()).to_string()
+            self.pattern
+                .replace(message, self.replacement.as_str())
+                .to_string()
         }
     }
 }
@@ -67,4 +72,3 @@ impl MessageBuffer {
         None
     }
 }
-

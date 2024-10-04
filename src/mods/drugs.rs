@@ -1,8 +1,8 @@
-use tokio::io::AsyncWriteExt;
+use crate::Config;
 use rand::prelude::*;
 use std::sync::Arc;
+use tokio::io::AsyncWriteExt;
 use tokio::sync::Mutex;
-use crate::Config;
 
 pub struct Drugs {
     pub fat: bool,
@@ -49,7 +49,7 @@ impl Drugs {
                 let chars = "       :.";
                 Self::color(
                     &chars.chars().choose(&mut thread_rng()).unwrap().to_string(),
-                    "07", // orange
+                    "07",       // orange
                     Some("08"), // yellow
                 )
             })
@@ -61,13 +61,21 @@ impl Drugs {
         let filter = format!(
             "{}{}",
             Self::color(";.`-,:.`;", "08", Some("07")), // yellow on orange
-            Self::color(" ", "08", Some("08")),          // yellow on yellow
+            Self::color(" ", "08", Some("08")),         // yellow on yellow
         );
         let cigarette = Self::color(&"|".repeat(size), "15", Some("00")); // light_grey on white
         let cherry = format!(
             "{}{}",
-            Self::color("\u{259A}", Self::random_choice(&["04", "08", "07"]), Some("01")), // random color on black
-            Self::color("\u{259A}", Self::random_choice(&["04", "08", "07"]), Some("14")), // random color on grey
+            Self::color(
+                "\u{259A}",
+                Self::random_choice(&["04", "08", "07"]),
+                Some("01")
+            ), // random color on black
+            Self::color(
+                "\u{259A}",
+                Self::random_choice(&["04", "08", "07"]),
+                Some("14")
+            ), // random color on grey
         );
         let smoke_chars = ";:-.,_`~'";
         let smoke = Self::color(
@@ -87,8 +95,16 @@ impl Drugs {
         let joint = Self::color(&"/".repeat(size), "15", Some("00")); // light_grey on white
         let cherry = format!(
             "{}{}",
-            Self::color("\u{259A}", Self::random_choice(&["04", "08", "07"]), Some("01")), // random color on black
-            Self::color("\u{259A}", Self::random_choice(&["04", "08", "07"]), Some("14")), // random color on grey
+            Self::color(
+                "\u{259A}",
+                Self::random_choice(&["04", "08", "07"]),
+                Some("01")
+            ), // random color on black
+            Self::color(
+                "\u{259A}",
+                Self::random_choice(&["04", "08", "07"]),
+                Some("14")
+            ), // random color on grey
         );
         let smoke_chars = ";:-.,_`~'";
         let smoke = Self::color(
@@ -182,7 +198,9 @@ impl Drugs {
                     if self.fat {
                         for _ in 0..3 {
                             writer
-                                .write_all(format!("PRIVMSG {} :{}\r\n", channel, object).as_bytes())
+                                .write_all(
+                                    format!("PRIVMSG {} :{}\r\n", channel, object).as_bytes(),
+                                )
                                 .await?;
                         }
                     } else {
@@ -204,8 +222,8 @@ impl Drugs {
                                 Self::color(" !!! ", "04", Some("03")), // red on green
                                 Self::color(
                                     "AWWW SHIT, IT'S TIME FOR THAT MARLBORO FATFUCK",
-                                    "01", // black
-                                    Some("03") // green
+                                    "01",       // black
+                                    Some("03")  // green
                                 ),
                                 Self::color(" !!! ", "04", Some("03")) // red on green
                             )
@@ -223,8 +241,8 @@ impl Drugs {
                                     Self::color(" !!! ", "00", Some("04")), // white on red
                                     Self::color(
                                         "AWWW SHIT, IT'S TIME FOR THAT NEWPORT 100",
-                                        "04", // red
-                                        Some("00") // white
+                                        "04",       // red
+                                        Some("00")  // white
                                     ),
                                     Self::color(" !!! ", "00", Some("04")) // white on red
                                 )
@@ -240,8 +258,8 @@ impl Drugs {
                                     Self::color(" !!! ", "04", Some("03")), // red on green
                                     Self::color(
                                         "OHHH FUCK, IT'S TIME FOR THAT 420 EXTENDO",
-                                        "08", // yellow
-                                        Some("03") // green
+                                        "08",       // yellow
+                                        Some("03")  // green
                                     ),
                                     Self::color(" !!! ", "04", Some("03")) // red on green
                                 )
@@ -293,8 +311,14 @@ impl Drugs {
     }
 
     fn generate_beer(&self) -> (String, String) {
-        let beer_choice = ["bud", "modelo", "ultra"].choose(&mut thread_rng()).unwrap().to_string();
-        let beer_temp = ["a piss warm", "an ice cold", "an empty"].choose(&mut thread_rng()).unwrap().to_string();
+        let beer_choice = ["bud", "modelo", "ultra"]
+            .choose(&mut thread_rng())
+            .unwrap()
+            .to_string();
+        let beer_temp = ["a piss warm", "an ice cold", "an empty"]
+            .choose(&mut thread_rng())
+            .unwrap()
+            .to_string();
         (beer_choice, beer_temp)
     }
 
@@ -303,7 +327,11 @@ impl Drugs {
             "bud" => format!(
                 "{}{}{}",
                 Self::color(" ", "00", Some("00")),
-                Self::color(" BUD ", "00", Some(["02", "05"].choose(&mut thread_rng()).unwrap())),
+                Self::color(
+                    " BUD ",
+                    "00",
+                    Some(["02", "05"].choose(&mut thread_rng()).unwrap())
+                ),
                 Self::color("c", "14", Some("00"))
             ),
             "modelo" => format!(
