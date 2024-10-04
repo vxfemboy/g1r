@@ -16,17 +16,10 @@ pub async fn proxy_exec(config: &Config) -> Result<TcpStream, Box<dyn std::error
     let username = config.proxy_username.clone().unwrap();
     let password = config.proxy_password.clone().unwrap();
     let tcp_stream = if !&username.is_empty() && !password.is_empty() {
-        
-        Socks5Stream::connect_with_password_and_socket(
-            proxy_stream,
-            server,
-            &username,
-            &password,
-        )
-        .await
-        .unwrap()
+        Socks5Stream::connect_with_password_and_socket(proxy_stream, server, &username, &password)
+            .await
+            .unwrap()
     } else {
-        
         Socks5Stream::connect_with_socket(proxy_stream, server)
             .await
             .unwrap()

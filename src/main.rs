@@ -2,9 +2,7 @@ use colored::*;
 use serde::Deserialize;
 use std::fs;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tokio::io::{
-    AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt,
-};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 #[derive(Deserialize, Clone)]
