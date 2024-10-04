@@ -3,13 +3,9 @@ use serde::Deserialize;
 use std::fs;
 use std::sync::atomic::{AtomicBool, Ordering};
 use tokio::io::{
-    split, AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader,
+    AsyncBufReadExt, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt,
 };
 use tokio::net::TcpStream;
-use tokio::sync::mpsc;
-use tokio_native_tls::native_tls::TlsConnector as NTlsConnector;
-use tokio_native_tls::TlsConnector;
-use tokio_socks::tcp::Socks5Stream;
 
 #[derive(Deserialize, Clone)]
 struct Config {
